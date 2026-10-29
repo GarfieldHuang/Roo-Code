@@ -18,6 +18,8 @@ vi.mock("../../../utils/path", async (importOriginal) => ({
 	getWorkspacePath: () => workspace.path,
 }))
 
+import OpenAI from "openai"
+
 import { OpenAiCodexHandler } from "../openai-codex"
 import { openAiCodexOAuthManager } from "../../../integrations/openai-codex/oauth"
 import {
@@ -337,6 +339,55 @@ describe("OpenAI Codex hosted tools", () => {
 		await collect(handler)
 
 		expect(create.mock.calls[0][0].instructions).toBe("system")
+	})
+})
+
+describe("OpenAI Codex connection failures", () => {
+	beforeEach(() => {
+		vi.restoreAllMocks()
+		vi.spyOn(openAiCodexOAuthManager, "getAccessToken").mockResolvedValue("test-token")
+		vi.spyOn(openAiCodexOAuthManager, "getAccountId").mockResolvedValue(null)
+	})
+
+	it("does not resend the request through fetch after a dropped connection, and reports the cause", async () => {
+		const handler = new OpenAiCodexHandler({ apiModelId: "gpt-6.1-sol" })
+		const cause = Object.assign(new Error("Body Timeout Error"), { code: "UND_ERR_BODY_TIMEOUT" })
+		const connectionError = new OpenAI.APIConnectionError({
+			cause: Object.assign(new TypeError("fetch failed"), { cause }),
+		})
+		;(handler as any).client = { responses: { create: vi.fn().mockRejectedValue(connectionError) } }
+		const fetchSpy = vi.spyOn(globalThis, "fetch")
+
+		await expect(collect(handler)).rejects.toThrow(/UND_ERR_BODY_TIMEOUT/)
+		expect(fetchSpy).not.toHaveBeenCalled()
+	})
+
+	it("does not resend after the stream already produced output", async () => {
+		const handler = new OpenAiCodexHandler({ apiModelId: "gpt-6.1-sol" })
+		;(handler as any).client = {
+			responses: {
+				create: vi.fn().mockResolvedValue({
+					async *[Symbol.asyncIterator]() {
+						yield { type: "response.output_text.delta", delta: "partial answer" }
+						throw new Error("stream broke")
+					},
+				}),
+			},
+		}
+		const fetchSpy = vi.spyOn(globalThis, "fetch")
+
+		const chunks: any[] = []
+		await expect(
+			(async () => {
+				for await (const chunk of handler.createMessage("system", [{ role: "user", content: "hi" } as any], {
+					taskId: "t",
+				})) {
+					chunks.push(chunk)
+				}
+			})(),
+		).rejects.toThrow(/stream broke/)
+		expect(fetchSpy).not.toHaveBeenCalled()
+		expect(chunks.filter((chunk) => chunk.type === "text")).toHaveLength(1)
 	})
 })
 

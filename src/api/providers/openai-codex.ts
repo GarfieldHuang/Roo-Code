@@ -47,6 +47,25 @@ export type OpenAiCodexModel = ReturnType<OpenAiCodexHandler["getModel"]>
 const CODEX_API_BASE_URL = "https://chatgpt.com/backend-api/codex"
 
 /**
+ * "fetch failed" alone says nothing; the actual reason (timeout, reset connection, DNS, proxy)
+ * is in the error's cause chain. Include it so failures can be diagnosed.
+ */
+export function describeNetworkError(error: unknown): string {
+	const parts: string[] = []
+	let current: any = error
+	for (let depth = 0; current && depth < 4; depth++) {
+		const code = typeof current.code === "string" ? current.code : undefined
+		const message = typeof current.message === "string" ? current.message : String(current)
+		const part = code && !message.includes(code) ? `${message} (${code})` : message
+		if (part && !parts.includes(part)) {
+			parts.push(part)
+		}
+		current = current.cause
+	}
+	return parts.join(" <- ") || "Unknown network error"
+}
+
+/**
  * Hosted tools run inside the model's response, and the model tends to stop right after
  * them. Roo needs every response to end with one of its own tools, so say so explicitly.
  */
@@ -461,6 +480,7 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 		try {
 			// Prefer OpenAI SDK streaming (same approach as openai-native) so event handling
 			// is consistent across providers.
+			let sdkYieldedOutput = false
 			try {
 				// Get ChatGPT account ID for organization subscriptions
 				const accountId = await openAiCodexOAuthManager.getAccountId()
@@ -480,6 +500,9 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 						apiKey: accessToken,
 						baseURL: CODEX_API_BASE_URL,
 						defaultHeaders: codexHeaders,
+						// Roo retries failed requests itself (with a visible countdown and a "Retry now"
+						// button); silent SDK retries would multiply the wait on a dropped connection.
+						maxRetries: 0,
 					})
 
 				const stream = (await (client as any).responses.create(requestBody, {
@@ -503,10 +526,19 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 						if (outChunk.type === "text") {
 							this.sawTextOutputInCurrentResponse = true
 						}
+						sdkYieldedOutput = true
 						yield outChunk
 					}
 				}
-			} catch (_sdkErr) {
+			} catch (sdkErr) {
+				// The manual SSE fallback is for SDK incompatibilities. Re-sending the whole request
+				// after a dropped connection doubles the wait, and after partial output it would
+				// duplicate what was already streamed.
+				if (sdkErr instanceof OpenAI.APIConnectionError || sdkYieldedOutput) {
+					throw new Error(
+						t("common:errors.openAiCodex.connectionFailed", { message: describeNetworkError(sdkErr) }),
+					)
+				}
 				// Fallback to manual SSE via fetch (Codex backend).
 				yield* this.makeCodexRequest(requestBody, model, accessToken, taskId)
 			}
@@ -695,7 +727,9 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 				if (error.message.includes("Codex API")) {
 					throw error
 				}
-				throw new Error(t("common:errors.openAiCodex.connectionFailed", { message: error.message }))
+				throw new Error(
+					t("common:errors.openAiCodex.connectionFailed", { message: describeNetworkError(error) }),
+				)
 			}
 			throw new Error(t("common:errors.openAiCodex.unexpectedConnectionError"))
 		}
