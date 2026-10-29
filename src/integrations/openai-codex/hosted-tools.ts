@@ -127,3 +127,72 @@ export async function saveGeneratedImage(base64Png: string, workspacePath: strin
 	await fs.writeFile(filePath, Buffer.from(base64Png, "base64"))
 	return filePath
 }
+
+export type WebSource = { title: string; url: string }
+
+/** Pages a web_search_call looked at (opened page and/or listed sources). */
+export function collectWebSearchSources(item: any): WebSource[] {
+	const action = item?.action
+	const sources: WebSource[] = []
+	if (!action || typeof action !== "object") {
+		return sources
+	}
+	if (typeof action.url === "string" && /^https?:\/\//.test(action.url)) {
+		sources.push({ title: action.url, url: action.url })
+	}
+	for (const source of Array.isArray(action.sources) ? action.sources : []) {
+		if (typeof source?.url === "string" && /^https?:\/\//.test(source.url)) {
+			sources.push({
+				title: typeof source.title === "string" && source.title ? source.title : source.url,
+				url: source.url,
+			})
+		}
+	}
+	return sources
+}
+
+// ChatGPT-style citation markers, e.g. "citeturn1view0". The ChatGPT app
+// turns them into source chips; anywhere else they show up as boxes, so they are removed.
+const CITE_START = ""
+const CITE_END = ""
+const MAX_PENDING_MARKER = 200
+
+/** Removes citation markers from streamed text, holding back a marker split across chunks. */
+export class CitationMarkerFilter {
+	private pending = ""
+
+	push(text: string): string {
+		let input = this.pending + text
+		this.pending = ""
+		let output = ""
+
+		while (input.length > 0) {
+			const start = input.indexOf(CITE_START)
+			if (start === -1) {
+				output += input
+				break
+			}
+			output += input.slice(0, start)
+			const end = input.indexOf(CITE_END, start + 1)
+			if (end === -1) {
+				const rest = input.slice(start)
+				if (rest.length <= MAX_PENDING_MARKER) {
+					this.pending = rest
+				} else {
+					// Not a real marker after all; keep the text without the stray control character.
+					output += rest.slice(1)
+				}
+				break
+			}
+			input = input.slice(end + 1)
+		}
+
+		return output
+	}
+
+	flush(): string {
+		const rest = this.pending.replace(/[-]/g, "")
+		this.pending = ""
+		return rest
+	}
+}

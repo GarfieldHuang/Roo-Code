@@ -194,6 +194,32 @@ describe("OpenAI Codex hosted tools", () => {
 		expect(JSON.parse(last.arguments)).toEqual({ result: "Index closed at 23,456." })
 	})
 
+	it("removes citation markers and lists the pages web search used as sources", async () => {
+		const handler = new OpenAiCodexHandler({ apiModelId: "gpt-6.1-sol" })
+		mockStream(handler, [
+			{
+				type: "response.output_item.done",
+				item: { type: "web_search_call", action: { type: "open_page", url: "https://tw.stock.example/2330" } },
+			},
+			// Marker split across two deltas, as streaming can do.
+			{ type: "response.output_text.delta", delta: "Price is 2,400. citeturn1" },
+			{ type: "response.output_text.delta", delta: "view0 Done." },
+			completed,
+		])
+
+		const chunks = await collect(handler)
+
+		const text = chunks
+			.filter((chunk) => chunk.type === "text")
+			.map((chunk) => chunk.text)
+			.join("")
+		expect(text).toBe("Price is 2,400.  Done.")
+		expect(chunks).toContainEqual({
+			type: "grounding",
+			sources: [{ title: "https://tw.stock.example/2330", url: "https://tw.stock.example/2330" }],
+		})
+	})
+
 	it("does not add attempt_completion when the model already called a tool", async () => {
 		const handler = new OpenAiCodexHandler({ apiModelId: "gpt-6.1-sol" })
 		mockStream(handler, [

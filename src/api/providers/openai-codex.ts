@@ -26,7 +26,10 @@ import { openAiCodexOAuthManager } from "../../integrations/openai-codex/oauth"
 import { getCachedOpenAiCodexModels } from "../../integrations/openai-codex/models"
 import {
 	buildHostedTools,
+	CitationMarkerFilter,
+	collectWebSearchSources,
 	describeWebSearchCall,
+	type WebSource,
 	hostedToolToDropForError,
 	markHostedToolRejected,
 	saveGeneratedImage,
@@ -90,6 +93,8 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 	private sawTextDeltaInCurrentResponse = false
 	// Whether a hosted tool (web search / image generation) ran in this response.
 	private usedHostedToolInCurrentResponse = false
+	// Pages hosted web search looked at (and url_citation annotations), shown as sources.
+	private webSourcesInCurrentResponse: WebSource[] = []
 	// Tracks tool call IDs emitted via streaming partial events to prevent done-event duplicates.
 	private streamedToolCallIds = new Set<string>()
 
@@ -114,6 +119,7 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 		"response.function_call_arguments.delta",
 		"response.tool_call_arguments.done",
 		"response.function_call_arguments.done",
+		"response.output_text.annotation.added",
 	])
 
 	constructor(options: ApiHandlerOptions) {
@@ -185,6 +191,7 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 		this.sawTextDeltaInCurrentResponse = false
 		this.streamedToolCallIds.clear()
 		this.usedHostedToolInCurrentResponse = false
+		this.webSourcesInCurrentResponse = []
 
 		// Get access token from OAuth manager
 		let accessToken = await openAiCodexOAuthManager.getAccessToken()
@@ -215,15 +222,35 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 				let responseText = ""
 				let calledFunctionTool = false
 				const savedImages: string[] = []
+				const citationFilter = new CitationMarkerFilter()
 				for await (const chunk of this.executeRequest(requestBody, model, accessToken, metadata?.taskId)) {
 					if (chunk.type === "text") {
-						responseText += chunk.text
+						const text = citationFilter.push(chunk.text)
+						responseText += text
+						if (text) {
+							yield { type: "text", text }
+						}
+						continue
 					} else if (chunk.type === "image") {
 						savedImages.push(chunk.imagePath)
 					} else if (chunk.type === "tool_call" || chunk.type === "tool_call_partial") {
 						calledFunctionTool = true
 					}
 					yield chunk
+				}
+
+				const remainingText = citationFilter.flush()
+				if (remainingText) {
+					responseText += remainingText
+					yield { type: "text", text: remainingText }
+				}
+
+				// List the pages web search used (the inline citation markers were removed above).
+				const sources = this.webSourcesInCurrentResponse.filter(
+					(source, index, all) => all.findIndex((other) => other.url === source.url) === index,
+				)
+				if (sources.length > 0) {
+					yield { type: "grounding", sources }
 				}
 
 				// Models often stop right after a hosted tool without calling one of Roo's tools,
@@ -944,6 +971,17 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 	}
 
 	private async *processEvent(event: any, model: OpenAiCodexModel): ApiStream {
+		if (event?.type === "response.output_text.annotation.added") {
+			const annotation = event.annotation
+			if (annotation?.type === "url_citation" && typeof annotation.url === "string") {
+				this.webSourcesInCurrentResponse.push({
+					title: annotation.title || annotation.url,
+					url: annotation.url,
+				})
+			}
+			return
+		}
+
 		if (event?.response?.output && Array.isArray(event.response.output)) {
 			this.lastResponseOutput = event.response.output
 		}
@@ -1115,6 +1153,7 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 				} else if (event.type === "response.output_item.done" && item.type === "web_search_call") {
 					// Hosted web search ran on the backend; show what it looked up.
 					this.usedHostedToolInCurrentResponse = true
+					this.webSourcesInCurrentResponse.push(...collectWebSearchSources(item))
 					const description = describeWebSearchCall(item)
 					if (description) {
 						yield { type: "reasoning", text: `\n${description}\n` }
