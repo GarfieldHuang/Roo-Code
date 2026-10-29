@@ -3329,8 +3329,13 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 					this.consecutiveNoAssistantMessagesCount = 0
 					// Display grounding sources to the user if they exist
 					if (pendingGroundingSources.length > 0) {
-						const citationLinks = pendingGroundingSources.map((source, i) => `[${i + 1}](${source.url})`)
-						const sourcesText = `${t("common:gemini.sources")} ${citationLinks.join(", ")}`
+						// One source per line with its full URL (and title when there is one), so it is
+						// clear where each source points without hovering a numbered link.
+						const sourceLines = pendingGroundingSources.map((source, i) => {
+							const title = source.title && source.title !== source.url ? `${source.title} — ` : ""
+							return `${i + 1}. ${title}<${source.url}>`
+						})
+						const sourcesText = `${t("common:gemini.sources")}\n\n${sourceLines.join("\n")}`
 
 						await this.say("text", sourcesText, undefined, false, undefined, undefined, {
 							isNonInteractive: true,
