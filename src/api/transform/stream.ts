@@ -11,7 +11,14 @@ export type ApiStreamChunk =
 	| ApiStreamToolCallDeltaChunk
 	| ApiStreamToolCallEndChunk
 	| ApiStreamToolCallPartialChunk
+	| ApiStreamImageChunk
 	| ApiStreamError
+
+/** An image the provider produced and saved to disk (e.g. a hosted image generation tool). */
+export interface ApiStreamImageChunk {
+	type: "image"
+	imagePath: string
+}
 
 export interface ApiStreamError {
 	type: "error"

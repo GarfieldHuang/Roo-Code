@@ -163,6 +163,30 @@ describe("OpenAI Codex hosted tools", () => {
 		const relative = text.trim().replace("🖼️ ", "")
 		expect(relative).toMatch(/^generated_images\/image-\d{8}-\d{6}\.png$/)
 		expect(await fs.readFile(path.join(workspace.path, relative))).toEqual(png)
+		// The task turns this into an inline preview once the stream ends.
+		expect(chunks).toContainEqual({ type: "image", imagePath: path.join(workspace.path, relative) })
+	})
+
+	it("tells the model to still call a tool after hosted tools", async () => {
+		const handler = new OpenAiCodexHandler({ apiModelId: "gpt-6.1-sol" })
+		const create = mockStream(handler, [completed])
+
+		await collect(handler)
+
+		expect(create.mock.calls[0][0].instructions).toMatch(/^system[\s\S]*SERVER-SIDE TOOLS[\s\S]*attempt_completion/)
+	})
+
+	it("keeps the system prompt unchanged when no hosted tools are sent", async () => {
+		const handler = new OpenAiCodexHandler({
+			apiModelId: "gpt-6.1-sol",
+			openAiCodexWebSearch: false,
+			openAiCodexImageGeneration: false,
+		})
+		const create = mockStream(handler, [completed])
+
+		await collect(handler)
+
+		expect(create.mock.calls[0][0].instructions).toBe("system")
 	})
 })
 

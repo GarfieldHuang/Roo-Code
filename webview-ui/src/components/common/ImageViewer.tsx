@@ -77,6 +77,8 @@ export function ImageViewer({
 			vscode.postMessage({
 				type: "saveImage",
 				dataUri: imageUri,
+				// Lets the extension read file-backed images (webview URIs are not data URIs).
+				...(imagePath ? { text: imagePath } : {}),
 			})
 		} catch (error) {
 			console.error("Error saving image:", error)

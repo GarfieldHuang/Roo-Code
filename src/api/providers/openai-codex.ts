@@ -43,6 +43,19 @@ export type OpenAiCodexModel = ReturnType<OpenAiCodexHandler["getModel"]>
 const CODEX_API_BASE_URL = "https://chatgpt.com/backend-api/codex"
 
 /**
+ * Hosted tools run inside the model's response, and the model tends to stop right after
+ * them. Roo needs every response to end with one of its own tools, so say so explicitly.
+ */
+const HOSTED_TOOLS_INSTRUCTIONS = `
+
+====
+
+SERVER-SIDE TOOLS
+
+web_search and image_generation (when available) run on the server inside your current response. They are not a substitute for the required tool call: after using them, continue in the same response and call the appropriate tool, e.g. attempt_completion once the task is done.
+Generated images are saved automatically under generated_images/ in the workspace and shown to the user; their path appears in your reply. Do not generate the same image again unless the user asks for changes.`
+
+/**
  * OpenAiCodexHandler - Uses OpenAI Responses API with OAuth authentication
  *
  * Key differences from OpenAiNativeHandler:
@@ -323,6 +336,12 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 			prompt_cache_key?: string
 		}
 
+		const hostedTools = buildHostedTools({
+			webSearch: this.options.openAiCodexWebSearch !== false,
+			// The Codex CLI only offers image generation to models that accept image input.
+			imageGeneration: this.options.openAiCodexImageGeneration !== false && !!model.info.supportsImages,
+		})
+
 		// Per the implementation guide: Codex backend may reject max_output_tokens
 		// and prompt_cache_retention, so we omit them
 		const body: ResponsesRequestBody = {
@@ -330,7 +349,7 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 			input: formattedInput,
 			stream: true,
 			store: false,
-			instructions: systemPrompt,
+			instructions: hostedTools.length > 0 ? systemPrompt + HOSTED_TOOLS_INSTRUCTIONS : systemPrompt,
 			// Only include encrypted reasoning content when reasoning effort is set
 			...(reasoningEffort ? { include: ["reasoning.encrypted_content"] } : {}),
 			...(reasoningEffort
@@ -356,11 +375,7 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 							strict: !isMcp,
 						}
 					}),
-				...buildHostedTools({
-					webSearch: this.options.openAiCodexWebSearch !== false,
-					// The Codex CLI only offers image generation to models that accept image input.
-					imageGeneration: this.options.openAiCodexImageGeneration !== false && !!model.info.supportsImages,
-				}),
+				...hostedTools,
 			],
 			tool_choice: metadata?.tool_choice,
 			parallel_tool_calls: metadata?.parallelToolCalls ?? true,
@@ -1083,6 +1098,7 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 								? path.relative(workspacePath, savedPath).replace(/\\/g, "/")
 								: savedPath
 							yield { type: "text", text: `\n\n🖼️ ${displayPath}\n\n` }
+							yield { type: "image", imagePath: savedPath }
 						} catch (error) {
 							console.error("[OpenAI Codex] Failed to save generated image:", error)
 						}

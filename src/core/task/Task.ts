@@ -2730,6 +2730,9 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				let assistantMessage = ""
 				let reasoningMessage = ""
 				let pendingGroundingSources: GroundingSource[] = []
+				// Images saved by the provider during the stream; shown once the stream finishes
+				// so they do not interrupt the partial text message being streamed.
+				const pendingGeneratedImages: string[] = []
 				this.isStreaming = true
 
 				try {
@@ -2798,6 +2801,9 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 								if (chunk.sources && chunk.sources.length > 0) {
 									pendingGroundingSources.push(...chunk.sources)
 								}
+								break
+							case "image":
+								pendingGeneratedImages.push(chunk.imagePath)
 								break
 							case "tool_call_partial": {
 								// Process raw tool call chunk through NativeToolCallParser
@@ -3329,6 +3335,19 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 						await this.say("text", sourcesText, undefined, false, undefined, undefined, {
 							isNonInteractive: true,
 						})
+					}
+
+					// Preview generated images in the chat (same block the generate_image tool uses:
+					// click to enlarge, open in editor, copy path, save as).
+					for (const imagePath of pendingGeneratedImages) {
+						const provider = this.providerRef.deref()
+						const imageUri =
+							provider?.convertToWebviewUri?.(imagePath) ?? vscode.Uri.file(imagePath).toString()
+						const separator = imageUri.includes("?") ? "&" : "?"
+						await this.say(
+							"image",
+							JSON.stringify({ imageUri: `${imageUri}${separator}t=${Date.now()}`, imagePath }),
+						)
 					}
 
 					// Build the assistant message content array

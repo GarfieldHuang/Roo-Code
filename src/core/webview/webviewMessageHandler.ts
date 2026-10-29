@@ -1120,6 +1120,17 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 			openImage(message.text!, { values: message.values })
 			break
 		case "saveImage":
+			// Images stored on disk are shown through a webview URI; send their bytes as a data URI.
+			if (message.dataUri && !message.dataUri.startsWith("data:") && message.text) {
+				try {
+					const ext = path.extname(message.text).slice(1).toLowerCase()
+					const format = ext === "jpg" ? "jpeg" : ext || "png"
+					const content = await fs.readFile(message.text)
+					message = { ...message, dataUri: `data:image/${format};base64,${content.toString("base64")}` }
+				} catch (error) {
+					provider.log(`Error reading image to save: ${error}`)
+				}
+			}
 			if (message.dataUri) {
 				const matches = message.dataUri.match(/^data:image\/([a-zA-Z]+);base64,(.+)$/)
 				if (!matches) {
