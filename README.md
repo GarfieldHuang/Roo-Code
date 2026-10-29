@@ -23,7 +23,7 @@
 - [Tiếng Việt](locales/vi/README.md)
 - [简体中文](locales/zh-CN/README.md)
 - [繁體中文](README.md)
-    </details>
+      </details>
 
 ---
 
@@ -56,6 +56,13 @@
 
 - 新版 VS Code 把內建的 ripgrep 從 `@vscode/ripgrep/bin/` 搬到 `@vscode/ripgrep-universal/bin/<平台>-<架構>/`。
 - 官方版找不到 ripgrep，每個任務在送出 API 請求前就失敗（log 顯示 `Could not find ripgrep binary`）。這個 fork 會一併搜尋新路徑。
+
+**5. 輸入框可以貼上、拖曳或選取任何檔案**
+
+- **貼上**：在檔案總管複製檔案後，直接在輸入框按 `Ctrl+V`。截圖等圖片照舊附加為圖片，其他檔案會存到擴充功能的儲存空間並以 `@` 提及插入。
+- **拖曳**：從檔案總管拖檔案進來時仍需**按住 Shift**（這是 VS Code 對 webview 的限制，擴充功能無法改變）。官方版只收圖片，這個 fork 連其他檔案也會收。
+- **迴紋針按鈕**：輸入框右上角原本的「新增圖片」改成「新增檔案或圖片」，可以選取任何檔案。工作區內的檔案以相對路徑提及，工作區外的以絕對路徑提及，都不會另外複製。即使模型不支援圖片，這個按鈕也能用。
+- `@` 提及 PDF、Word（.docx）、Excel（.xlsx）時會抽出文字內容，官方版會當作二進位檔直接略過。
 
 ### 安裝
 
