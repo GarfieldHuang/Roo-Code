@@ -36,6 +36,12 @@ import {
 	markHostedToolRejected,
 	saveGeneratedImage,
 } from "../../integrations/openai-codex/hosted-tools"
+import {
+	CODEX_WEBSOCKET_BETA_HEADER,
+	CodexWebSocketUnavailableError,
+	streamCodexResponseOverWebSocket,
+	toWebSocketUrl,
+} from "../../integrations/openai-codex/websocket"
 import { getWorkspacePath } from "../../utils/path"
 import { t } from "../../i18n"
 
@@ -46,6 +52,15 @@ export type OpenAiCodexModel = ReturnType<OpenAiCodexHandler["getModel"]>
  * Per the implementation guide: requests are routed to chatgpt.com/backend-api/codex
  */
 const CODEX_API_BASE_URL = "https://chatgpt.com/backend-api/codex"
+
+// When the WebSocket transport fails to connect, use HTTP for a while before trying it again
+// (a failed handshake can also just be an expired token, which HTTP then refreshes).
+const WEBSOCKET_RETRY_AFTER_MS = 10 * 60 * 1000
+let codexWebSocketUnavailableUntil = 0
+
+export function resetCodexWebSocketAvailability(): void {
+	codexWebSocketUnavailableUntil = 0
+}
 
 /**
  * "fetch failed" alone says nothing; the actual reason (timeout, reset connection, DNS, proxy)
@@ -484,6 +499,44 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 		this.abortController = new AbortController()
 
 		try {
+			// WebSocket first (as the Codex CLI does): events arrive frame by frame even on networks
+			// that buffer and time out long HTTP responses. If it cannot connect, use HTTP from then on.
+			// Tests that inject an SDK client exercise the HTTP path.
+			if (!this.client && Date.now() >= codexWebSocketUnavailableUntil) {
+				const accountId = await openAiCodexOAuthManager.getAccountId()
+				try {
+					for await (const event of streamCodexResponseOverWebSocket({
+						url: toWebSocketUrl(`${CODEX_API_BASE_URL}/responses`),
+						headers: {
+							Authorization: `Bearer ${accessToken}`,
+							"OpenAI-Beta": CODEX_WEBSOCKET_BETA_HEADER,
+							originator: "roo-code",
+							session_id: taskId || this.sessionId,
+							"User-Agent": `roo-code/${Package.version} (${os.platform()} ${os.release()}; ${os.arch()}) node/${process.version.slice(1)}`,
+							...(accountId ? { "ChatGPT-Account-Id": accountId } : {}),
+						},
+						body: requestBody,
+						signal: this.abortController.signal,
+					})) {
+						for await (const outChunk of this.processEvent(event, model)) {
+							if (outChunk.type === "text") {
+								this.sawTextOutputInCurrentResponse = true
+							}
+							yield outChunk
+						}
+					}
+					return
+				} catch (wsError) {
+					if (!(wsError instanceof CodexWebSocketUnavailableError)) {
+						throw new Error(
+							t("common:errors.openAiCodex.connectionFailed", { message: describeNetworkError(wsError) }),
+						)
+					}
+					codexWebSocketUnavailableUntil = Date.now() + WEBSOCKET_RETRY_AFTER_MS
+					console.warn(`[OpenAI Codex] ${wsError.message}; using HTTP streaming instead`)
+				}
+			}
+
 			// Prefer OpenAI SDK streaming (same approach as openai-native) so event handling
 			// is consistent across providers.
 			let sdkYieldedOutput = false
