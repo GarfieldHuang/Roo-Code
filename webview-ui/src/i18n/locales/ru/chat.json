@@ -134,6 +134,7 @@
 	"forPreviousMode": "для предыдущего режима",
 	"apiRequest": {
 		"retryNow": "Повторить сейчас",
+		"retrying": "Запрос отправлен повторно (попытка {{attempt}}), ожидание ответа…",
 		"title": "API-запрос",
 		"failed": "API-запрос не выполнен",
 		"streaming": "API-запрос...",

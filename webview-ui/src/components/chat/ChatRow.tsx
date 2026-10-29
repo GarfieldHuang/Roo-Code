@@ -1126,23 +1126,39 @@ export const ChatRowContent = ({
 						// retry information using this "tag" as a convention
 						const retryTimerMatch = message.text.match(/<retry_timer>(.*?)<\/retry_timer>/)
 						const retryTimer = retryTimerMatch && retryTimerMatch[1] ? parseInt(retryTimerMatch[1], 10) : 0
-						rawError = message.text.replace(/<retry_timer>(.*?)<\/retry_timer>/, "").trim()
-						retryInfo = retryTimer > 0 && (
-							<div
-								className={cn(
-									"mt-2 font-light text-xs  text-vscode-descriptionForeground cursor-default flex items-center gap-1 transition-all duration-1000",
-									retryTimer === 0 ? "opacity-0 max-h-0" : "max-h-6 opacity-100",
-								)}>
-								<Repeat2 className="size-3" strokeWidth={1.5} />
-								<span>{retryTimer}s</span>
-								<button
-									type="button"
-									className="ml-2 px-2 py-0.5 rounded border border-vscode-button-border bg-vscode-button-secondaryBackground text-vscode-button-secondaryForeground hover:bg-vscode-button-secondaryHoverBackground cursor-pointer"
-									onClick={() => vscode.postMessage({ type: "retryApiRequestNow" })}>
-									{t("chat:apiRequest.retryNow")}
-								</button>
-							</div>
-						)
+						const retryAttemptMatch = message.text.match(/<retry_attempt>(\d+)<\/retry_attempt>/)
+						const retryAttempt = retryAttemptMatch ? parseInt(retryAttemptMatch[1], 10) : 0
+						rawError = message.text
+							.replace(/<retry_timer>(.*?)<\/retry_timer>/, "")
+							.replace(/<retry_attempt>\d+<\/retry_attempt>/, "")
+							.trim()
+						// After the countdown the request has been resent; say so instead of leaving only the error.
+						if (retryTimer === 0 && retryAttempt > 0) {
+							retryInfo = (
+								<div className="mt-2 font-light text-xs text-vscode-descriptionForeground cursor-default flex items-center gap-1">
+									<Repeat2 className="size-3" strokeWidth={1.5} />
+									<span>{t("chat:apiRequest.retrying", { attempt: retryAttempt })}</span>
+								</div>
+							)
+						}
+						retryInfo =
+							retryInfo ||
+							(retryTimer > 0 && (
+								<div
+									className={cn(
+										"mt-2 font-light text-xs  text-vscode-descriptionForeground cursor-default flex items-center gap-1 transition-all duration-1000",
+										retryTimer === 0 ? "opacity-0 max-h-0" : "max-h-6 opacity-100",
+									)}>
+									<Repeat2 className="size-3" strokeWidth={1.5} />
+									<span>{retryTimer}s</span>
+									<button
+										type="button"
+										className="ml-2 px-2 py-0.5 rounded border border-vscode-button-border bg-vscode-button-secondaryBackground text-vscode-button-secondaryForeground hover:bg-vscode-button-secondaryHoverBackground cursor-pointer"
+										onClick={() => vscode.postMessage({ type: "retryApiRequestNow" })}>
+										{t("chat:apiRequest.retryNow")}
+									</button>
+								</div>
+							))
 					}
 					return (
 						<ErrorRow

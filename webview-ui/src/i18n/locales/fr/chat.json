@@ -139,6 +139,7 @@
 	"troubleMessage": "Roo rencontre des difficultés...",
 	"apiRequest": {
 		"retryNow": "Réessayer maintenant",
+		"retrying": "Requête renvoyée (tentative {{attempt}}), en attente de réponse…",
 		"title": "Requête API",
 		"failed": "Échec de la requête API",
 		"streaming": "Requête API...",

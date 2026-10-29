@@ -134,6 +134,7 @@
 	"forPreviousMode": "voor vorige modus",
 	"apiRequest": {
 		"retryNow": "Nu opnieuw proberen",
+		"retrying": "Verzoek opnieuw verzonden (poging {{attempt}}), wachten op antwoord…",
 		"title": "API-verzoek",
 		"failed": "API-verzoek mislukt",
 		"streaming": "API-verzoek...",

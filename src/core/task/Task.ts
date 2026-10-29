@@ -4363,7 +4363,13 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			}
 			this.retryCountdownSkipped = false
 
-			await this.say("api_req_retry_delayed", headerText, undefined, false)
+			// The retry is sent right after this; say so, otherwise the row looks stuck on the error.
+			await this.say(
+				"api_req_retry_delayed",
+				`${headerText}<retry_attempt>${retryAttempt + 1}</retry_attempt>`,
+				undefined,
+				false,
+			)
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err)
 

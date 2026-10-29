@@ -139,6 +139,7 @@
 	"troubleMessage": "Roo sorun yaşıyor...",
 	"apiRequest": {
 		"retryNow": "Şimdi yeniden dene",
+		"retrying": "İstek yeniden gönderildi (deneme {{attempt}}), yanıt bekleniyor…",
 		"title": "API İsteği",
 		"failed": "API İsteği Başarısız",
 		"streaming": "API İsteği...",

@@ -139,6 +139,7 @@
 	"troubleMessage": "Rooに問題が発生しています...",
 	"apiRequest": {
 		"retryNow": "今すぐ再試行",
+		"retrying": "リクエストを再送信しました（再試行 {{attempt}} 回目）。応答を待っています…",
 		"title": "APIリクエスト",
 		"failed": "APIリクエスト失敗",
 		"streaming": "APIリクエスト...",

@@ -164,6 +164,7 @@
 	"forPreviousMode": "untuk mode sebelumnya",
 	"apiRequest": {
 		"retryNow": "Coba lagi sekarang",
+		"retrying": "Permintaan dikirim ulang (percobaan {{attempt}}), menunggu respons…",
 		"title": "Permintaan API",
 		"failed": "Permintaan API Gagal",
 		"streaming": "Permintaan API...",

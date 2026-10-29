@@ -139,6 +139,7 @@
 	"troubleMessage": "Roo đang gặp sự cố...",
 	"apiRequest": {
 		"retryNow": "Thử lại ngay",
+		"retrying": "Đã gửi lại yêu cầu (lần thử {{attempt}}), đang chờ phản hồi…",
 		"title": "Yêu cầu API",
 		"failed": "Yêu cầu API thất bại",
 		"streaming": "Yêu cầu API...",

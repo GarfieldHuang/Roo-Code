@@ -161,6 +161,7 @@
 	"forPreviousMode": "for previous mode",
 	"apiRequest": {
 		"retryNow": "Retry now",
+		"retrying": "Request resent (retry {{attempt}}), waiting for a response…",
 		"title": "API Request",
 		"failed": "API Request Failed",
 		"streaming": "API Request...",

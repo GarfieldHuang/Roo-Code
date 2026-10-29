@@ -139,6 +139,7 @@
 	"troubleMessage": "Roo està tenint problemes...",
 	"apiRequest": {
 		"retryNow": "Torna-ho a provar ara",
+		"retrying": "Sol·licitud reenviada (reintent {{attempt}}), esperant resposta…",
 		"title": "Sol·licitud API",
 		"failed": "Sol·licitud API ha fallat",
 		"streaming": "Sol·licitud API...",
