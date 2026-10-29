@@ -9,7 +9,7 @@
 <details>
   <summary>🌐 사용 가능한 언어</summary>
 
-- [English](../../README.md)
+- [English](../../README.en.md)
 - [Català](../ca/README.md)
 - [Deutsch](../de/README.md)
 - [Español](../es/README.md)
@@ -28,7 +28,7 @@
 - [简体中文](../zh-CN/README.md)
 - [繁體中文](../zh-TW/README.md)
 - ...
-    </details>
+      </details>
 
 ---
 
