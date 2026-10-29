@@ -3335,7 +3335,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 							const title = source.title && source.title !== source.url ? `${source.title} — ` : ""
 							return `${i + 1}. ${title}<${source.url}>`
 						})
-						const sourcesText = `${t("common:gemini.sources")}\n\n${sourceLines.join("\n")}`
+						const sourcesText = `${t("common:errors.gemini.sources")}\n\n${sourceLines.join("\n")}`
 
 						await this.say("text", sourcesText, undefined, false, undefined, undefined, {
 							isNonInteractive: true,

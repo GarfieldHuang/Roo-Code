@@ -38,6 +38,7 @@ import { codebaseSearchTool } from "../tools/CodebaseSearchTool"
 
 import { formatResponse } from "../prompts/responses"
 import { sanitizeToolUseId } from "../../utils/tool-id"
+import { stripCitationMarkersDeep } from "../../shared/citation-markers"
 
 /**
  * Processes and presents assistant message content to the user interface.
@@ -293,6 +294,15 @@ export async function presentAssistantMessage(cline: Task) {
 			break
 		}
 		case "tool_use": {
+			// Citation markers from hosted web search must not leak into tool arguments
+			// (completion results, file contents, commands).
+			if (block.params) {
+				block.params = stripCitationMarkersDeep(block.params)
+			}
+			if (block.nativeArgs) {
+				block.nativeArgs = stripCitationMarkersDeep(block.nativeArgs)
+			}
+
 			// Native tool calling is the only supported tool calling mechanism.
 			// A tool_use block without an id is invalid and cannot be executed.
 			const toolCallId = (block as any).id as string | undefined
