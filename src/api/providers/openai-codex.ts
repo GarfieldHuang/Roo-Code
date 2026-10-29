@@ -30,6 +30,7 @@ import {
 	collectWebSearchSources,
 	describeWebSearchCall,
 	hostedToolIncludes,
+	reasoningStreamOptions,
 	type WebSource,
 	hostedToolToDropForError,
 	markHostedToolRejected,
@@ -412,6 +413,7 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 			tool_choice?: any
 			parallel_tool_calls?: boolean
 			prompt_cache_key?: string
+			stream_options?: Record<string, unknown>
 		}
 
 		const hostedTools = buildHostedTools({
@@ -419,6 +421,8 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 			// The Codex CLI only offers image generation to models that accept image input.
 			imageGeneration: this.options.openAiCodexImageGeneration !== false && !!model.info.supportsImages,
 		})
+		// Summaries are requested together with reasoning effort (see `reasoning.summary` below).
+		const streamOptions = reasoningStreamOptions(!!reasoningEffort)
 		const includes = [
 			...(reasoningEffort ? ["reasoning.encrypted_content"] : []),
 			...hostedToolIncludes(hostedTools),
@@ -463,6 +467,8 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 			parallel_tool_calls: metadata?.parallelToolCalls ?? true,
 			// Same key for every request of a task so the backend can reuse the cached prompt prefix.
 			prompt_cache_key: metadata?.taskId || this.sessionId,
+			// Stream reasoning summaries during long thinking so the connection is never idle for long.
+			...(streamOptions ? { stream_options: streamOptions } : {}),
 		}
 
 		return body

@@ -163,6 +163,37 @@ describe("OpenAI Codex hosted tools", () => {
 		expect(retried.tools.map((tool: any) => tool.type)).toContain("web_search")
 	})
 
+	it("asks for reasoning summaries while the model is still reasoning", async () => {
+		const handler = new OpenAiCodexHandler({ apiModelId: "gpt-6.1-sol" })
+		const create = mockStream(handler, [completed])
+
+		await collect(handler)
+
+		expect(create.mock.calls[0][0].stream_options).toEqual({ reasoning_summary_delivery: "sequential_cutoff" })
+	})
+
+	it("retries without stream_options when the backend rejects them", async () => {
+		const handler = new OpenAiCodexHandler({ apiModelId: "gpt-6.1-sol" })
+		const create = vi
+			.fn()
+			.mockRejectedValueOnce(new Error("sdk error"))
+			.mockResolvedValue({
+				async *[Symbol.asyncIterator]() {
+					yield completed
+				},
+			})
+		;(handler as any).client = { responses: { create } }
+		vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+			new Response(JSON.stringify({ error: { message: "Unknown parameter: 'stream_options'." } }), {
+				status: 400,
+			}),
+		)
+
+		await collect(handler)
+
+		expect(create.mock.calls[1][0].stream_options).toBeUndefined()
+	})
+
 	it("leaves hosted tools out when turned off in settings", async () => {
 		const handler = new OpenAiCodexHandler({
 			apiModelId: "gpt-6.1-sol",

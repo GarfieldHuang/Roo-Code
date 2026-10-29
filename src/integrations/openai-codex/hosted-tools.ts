@@ -51,6 +51,17 @@ export function buildHostedTools(options: HostedToolOptions): Record<string, unk
 	return tools
 }
 
+/**
+ * Ask for reasoning summaries while the model is still reasoning ("sequential_cutoff", as the
+ * Codex CLI's concurrent reasoning summaries do). Without it a long think sends nothing until it
+ * ends, and proxies that drop idle connections (~120s here) cut the stream.
+ */
+export function reasoningStreamOptions(summaryRequested: boolean): Record<string, unknown> | undefined {
+	return summaryRequested && !rejectedHostedTools.has("stream_options")
+		? { reasoning_summary_delivery: "sequential_cutoff" }
+		: undefined
+}
+
 export const WEB_SEARCH_SOURCES_INCLUDE = "web_search_call.action.sources"
 
 /**
@@ -71,6 +82,12 @@ export function hostedToolToDropForError(message: string, tools: Record<string, 
 	const text = message.toLowerCase()
 	const types = new Set(tools.map((tool) => String(tool.type)))
 
+	if (
+		(text.includes("stream_options") || text.includes("reasoning_summary_delivery")) &&
+		!rejectedHostedTools.has("stream_options")
+	) {
+		return "stream_options"
+	}
 	if (
 		types.has("web_search") &&
 		text.includes(WEB_SEARCH_SOURCES_INCLUDE) &&
