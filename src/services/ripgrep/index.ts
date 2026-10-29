@@ -92,7 +92,12 @@ export async function getBinPath(vscodeAppRoot: string): Promise<string | undefi
 		(await checkPath("node_modules/@vscode/ripgrep/bin/")) ||
 		(await checkPath("node_modules/vscode-ripgrep/bin")) ||
 		(await checkPath("node_modules.asar.unpacked/vscode-ripgrep/bin/")) ||
-		(await checkPath("node_modules.asar.unpacked/@vscode/ripgrep/bin/"))
+		(await checkPath("node_modules.asar.unpacked/@vscode/ripgrep/bin/")) ||
+		// Newer VS Code builds ship a multi-platform package with per-platform subfolders.
+		(await checkPath(`node_modules/@vscode/ripgrep-universal/bin/${process.platform}-${process.arch}/`)) ||
+		(await checkPath(
+			`node_modules.asar.unpacked/@vscode/ripgrep-universal/bin/${process.platform}-${process.arch}/`,
+		))
 	)
 }
 

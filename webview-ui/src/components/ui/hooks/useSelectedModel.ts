@@ -37,6 +37,7 @@ import { useRouterModels } from "./useRouterModels"
 import { useOpenRouterModelProviders } from "./useOpenRouterModelProviders"
 import { useLmStudioModels } from "./useLmStudioModels"
 import { useOllamaModels } from "./useOllamaModels"
+import { useOpenAiCodexModels } from "./useOpenAiCodexModels"
 
 /**
  * Helper to get a validated model ID for dynamic providers.
@@ -68,6 +69,8 @@ export const useSelectedModel = (apiConfiguration?: ProviderSettings) => {
 	const openRouterModelProviders = useOpenRouterModelProviders(openRouterModelId)
 	const lmStudioModels = useLmStudioModels(lmStudioModelId)
 	const ollamaModels = useOllamaModels(ollamaModelId)
+	// Live Codex catalog is optional: the static list is used until (or unless) it loads.
+	const openAiCodexLiveModels = useOpenAiCodexModels(activeProvider === "openai-codex")
 
 	// Compute readiness only for the data actually needed for the selected provider
 	const needRouterModels = shouldFetchRouterModels
@@ -98,6 +101,7 @@ export const useSelectedModel = (apiConfiguration?: ProviderSettings) => {
 					openRouterModelProviders: (openRouterModelProviders.data || {}) as Record<string, ModelInfo>,
 					lmStudioModels: (lmStudioModels.data || undefined) as ModelRecord | undefined,
 					ollamaModels: (ollamaModels.data || undefined) as ModelRecord | undefined,
+					openAiCodexLiveModels: openAiCodexLiveModels.data,
 				})
 			: { id: getProviderDefaultModelId(activeProvider ?? "openrouter"), info: undefined }
 
@@ -125,6 +129,7 @@ function getSelectedModel({
 	openRouterModelProviders,
 	lmStudioModels,
 	ollamaModels,
+	openAiCodexLiveModels,
 }: {
 	provider: ProviderName
 	apiConfiguration: ProviderSettings
@@ -132,6 +137,7 @@ function getSelectedModel({
 	openRouterModelProviders: Record<string, ModelInfo>
 	lmStudioModels: ModelRecord | undefined
 	ollamaModels: ModelRecord | undefined
+	openAiCodexLiveModels?: ModelRecord
 }): { id: string; info: ModelInfo | undefined } {
 	// the `undefined` case are used to show the invalid selection to prevent
 	// users from seeing the default model if their selection is invalid
@@ -324,7 +330,7 @@ function getSelectedModel({
 		}
 		case "openai-codex": {
 			const id = apiConfiguration.apiModelId ?? defaultModelId
-			const info = openAiCodexModels[id as keyof typeof openAiCodexModels]
+			const info = openAiCodexLiveModels?.[id] ?? openAiCodexModels[id as keyof typeof openAiCodexModels]
 			return { id, info }
 		}
 		case "vercel-ai-gateway": {

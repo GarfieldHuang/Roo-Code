@@ -1,10 +1,11 @@
-import React from "react"
+import React, { useMemo } from "react"
 
-import { type ProviderSettings, openAiCodexDefaultModelId, openAiCodexModels } from "@roo-code/types"
+import { type ModelInfo, type ProviderSettings, openAiCodexDefaultModelId, openAiCodexModels } from "@roo-code/types"
 
 import { useAppTranslation } from "@src/i18n/TranslationContext"
 import { Button } from "@src/components/ui"
 import { vscode } from "@src/utils/vscode"
+import { useOpenAiCodexModels } from "@src/components/ui/hooks/useOpenAiCodexModels"
 
 import { ModelPicker } from "../ModelPicker"
 import { OpenAICodexRateLimitDashboard } from "./OpenAICodexRateLimitDashboard"
@@ -23,6 +24,21 @@ export const OpenAICodex: React.FC<OpenAICodexProps> = ({
 	openAiCodexIsAuthenticated = false,
 }) => {
 	const { t } = useAppTranslation()
+	const { data: liveModels } = useOpenAiCodexModels(openAiCodexIsAuthenticated)
+	const selectedModelId = apiConfiguration.apiModelId
+
+	// Prefer the live catalog from the Codex backend; keep the current selection listed even if it
+	// has been retired so the picker does not silently show a different model.
+	const models = useMemo<Record<string, ModelInfo>>(() => {
+		const staticModels: Record<string, ModelInfo> = openAiCodexModels
+		if (!liveModels || Object.keys(liveModels).length === 0) {
+			return staticModels
+		}
+		if (selectedModelId && !liveModels[selectedModelId] && staticModels[selectedModelId]) {
+			return { ...liveModels, [selectedModelId]: staticModels[selectedModelId] }
+		}
+		return liveModels
+	}, [liveModels, selectedModelId])
 
 	return (
 		<div className="flex flex-col gap-4">
@@ -59,7 +75,7 @@ export const OpenAICodex: React.FC<OpenAICodexProps> = ({
 				apiConfiguration={apiConfiguration}
 				setApiConfigurationField={setApiConfigurationField}
 				defaultModelId={openAiCodexDefaultModelId}
-				models={openAiCodexModels}
+				models={models}
 				modelIdKey="apiModelId"
 				serviceName="OpenAI - ChatGPT Plus/Pro"
 				serviceUrl="https://chatgpt.com"

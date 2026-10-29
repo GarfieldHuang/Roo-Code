@@ -81,6 +81,7 @@ export interface ExtensionMessage {
 		| "modes"
 		| "taskWithAggregatedCosts"
 		| "openAiCodexRateLimits"
+		| "openAiCodexModels"
 		// Worktree response types
 		| "worktreeList"
 		| "worktreeResult"
@@ -126,6 +127,7 @@ export interface ExtensionMessage {
 	openAiModels?: string[]
 	ollamaModels?: ModelRecord
 	lmStudioModels?: ModelRecord
+	openAiCodexModels?: ModelRecord
 	vsCodeLmModels?: { vendor?: string; family?: string; version?: string; id?: string }[]
 	mcpServers?: McpServer[]
 	commits?: GitCommit[]
@@ -498,6 +500,7 @@ export interface WebviewMessage {
 		| "openDebugUiHistory"
 		| "downloadErrorDiagnostics"
 		| "requestOpenAiCodexRateLimits"
+		| "requestOpenAiCodexModels"
 		| "refreshCustomTools"
 		| "requestModes"
 		| "switchMode"

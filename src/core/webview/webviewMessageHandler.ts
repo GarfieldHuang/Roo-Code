@@ -2166,6 +2166,8 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 			try {
 				const { openAiCodexOAuthManager } = await import("../../integrations/openai-codex/oauth")
 				await openAiCodexOAuthManager.clearCredentials()
+				const { clearOpenAiCodexModelCache } = await import("../../integrations/openai-codex/models")
+				await clearOpenAiCodexModelCache()
 				vscode.window.showInformationMessage("Signed out from OpenAI Codex")
 				await provider.postStateToWebview()
 			} catch (error) {
@@ -2877,6 +2879,27 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 				provider.log(`Error fetching OpenAI Codex rate limits: ${errorMessage}`)
 				provider.postMessageToWebview({
 					type: "openAiCodexRateLimits",
+					error: errorMessage,
+				})
+			}
+			break
+		}
+
+		case "requestOpenAiCodexModels": {
+			try {
+				const { refreshOpenAiCodexModels } = await import("../../integrations/openai-codex/models")
+				const models = await refreshOpenAiCodexModels({ force: true })
+
+				provider.postMessageToWebview(
+					models
+						? { type: "openAiCodexModels", openAiCodexModels: models }
+						: { type: "openAiCodexModels", error: "Not authenticated with OpenAI Codex" },
+				)
+			} catch (error) {
+				const errorMessage = error instanceof Error ? error.message : String(error)
+				provider.log(`Error fetching OpenAI Codex models: ${errorMessage}`)
+				provider.postMessageToWebview({
+					type: "openAiCodexModels",
 					error: errorMessage,
 				})
 			}

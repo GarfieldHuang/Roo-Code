@@ -6,7 +6,6 @@ import OpenAI from "openai"
 import {
 	type ModelInfo,
 	openAiCodexDefaultModelId,
-	OpenAiCodexModelId,
 	openAiCodexModels,
 	type ReasoningEffort,
 	type ReasoningEffortExtended,
@@ -23,6 +22,7 @@ import type { SingleCompletionHandler, ApiHandlerCreateMessageMetadata } from ".
 import { isMcpTool } from "../../utils/mcp-name"
 import { sanitizeOpenAiCallId } from "../../utils/tool-id"
 import { openAiCodexOAuthManager } from "../../integrations/openai-codex/oauth"
+import { getCachedOpenAiCodexModels } from "../../integrations/openai-codex/models"
 import { t } from "../../i18n"
 
 export type OpenAiCodexModel = ReturnType<OpenAiCodexHandler["getModel"]>
@@ -1110,10 +1110,13 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 
 	override getModel() {
 		const modelId = this.options.apiModelId
+		const staticModels: Record<string, ModelInfo> = openAiCodexModels
+		// Live catalog fetched from the Codex backend; lets models newer than the static list resolve.
+		const liveModels = getCachedOpenAiCodexModels()
 
-		let id = modelId && modelId in openAiCodexModels ? (modelId as OpenAiCodexModelId) : openAiCodexDefaultModelId
+		const id = modelId && (liveModels?.[modelId] || staticModels[modelId]) ? modelId : openAiCodexDefaultModelId
 
-		const info: ModelInfo = openAiCodexModels[id]
+		const info: ModelInfo = liveModels?.[id] ?? staticModels[id]
 
 		const params = getModelParams({
 			format: "openai",
