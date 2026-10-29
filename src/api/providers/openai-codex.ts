@@ -29,6 +29,7 @@ import {
 	CitationMarkerFilter,
 	collectWebSearchSources,
 	describeWebSearchCall,
+	hostedToolIncludes,
 	type WebSource,
 	hostedToolToDropForError,
 	markHostedToolRejected,
@@ -399,6 +400,10 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 			// The Codex CLI only offers image generation to models that accept image input.
 			imageGeneration: this.options.openAiCodexImageGeneration !== false && !!model.info.supportsImages,
 		})
+		const includes = [
+			...(reasoningEffort ? ["reasoning.encrypted_content"] : []),
+			...hostedToolIncludes(hostedTools),
+		]
 
 		// Per the implementation guide: Codex backend may reject max_output_tokens
 		// and prompt_cache_retention, so we omit them
@@ -408,8 +413,8 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 			stream: true,
 			store: false,
 			instructions: hostedTools.length > 0 ? systemPrompt + HOSTED_TOOLS_INSTRUCTIONS : systemPrompt,
-			// Only include encrypted reasoning content when reasoning effort is set
-			...(reasoningEffort ? { include: ["reasoning.encrypted_content"] } : {}),
+			// Encrypted reasoning only when reasoning effort is set; search sources when web search is on
+			...(includes.length > 0 ? { include: includes } : {}),
 			...(reasoningEffort
 				? {
 						reasoning: {
@@ -1090,6 +1095,24 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 		if (event?.type === "response.output_item.added" || event?.type === "response.output_item.done") {
 			const item = event?.item
 			if (item) {
+				// Citations can also arrive only as annotations on the finished message.
+				if (
+					event.type === "response.output_item.done" &&
+					item.type === "message" &&
+					Array.isArray(item.content)
+				) {
+					for (const content of item.content) {
+						for (const annotation of Array.isArray(content?.annotations) ? content.annotations : []) {
+							if (annotation?.type === "url_citation" && typeof annotation.url === "string") {
+								this.webSourcesInCurrentResponse.push({
+									title: annotation.title || annotation.url,
+									url: annotation.url,
+								})
+							}
+						}
+					}
+				}
+
 				// Capture tool identity so subsequent argument deltas can be attributed.
 				if (item.type === "function_call" || item.type === "tool_call") {
 					const callId = item.call_id || item.tool_call_id || item.id

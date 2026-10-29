@@ -93,6 +93,74 @@ describe("OpenAI Codex hosted tools", () => {
 		)
 	})
 
+	it("asks for web search sources and collects them with message annotations", async () => {
+		const handler = new OpenAiCodexHandler({ apiModelId: "gpt-6.1-sol" })
+		const create = mockStream(handler, [
+			{
+				type: "response.output_item.done",
+				item: {
+					type: "web_search_call",
+					action: {
+						type: "search",
+						query: "finance: GOOGL",
+						sources: [{ type: "url", url: "https://finance.example/GOOGL" }],
+					},
+				},
+			},
+			{ type: "response.output_text.delta", delta: "GOOGL 324.89" },
+			{
+				type: "response.output_item.done",
+				item: {
+					type: "message",
+					content: [
+						{
+							type: "output_text",
+							text: "GOOGL 324.89",
+							annotations: [{ type: "url_citation", url: "https://news.example/a", title: "News A" }],
+						},
+					],
+				},
+			},
+			completed,
+		])
+
+		const chunks = await collect(handler)
+
+		expect(create.mock.calls[0][0].include).toContain("web_search_call.action.sources")
+		expect(chunks).toContainEqual({
+			type: "grounding",
+			sources: [
+				{ title: "https://finance.example/GOOGL", url: "https://finance.example/GOOGL" },
+				{ title: "News A", url: "https://news.example/a" },
+			],
+		})
+	})
+
+	it("retries without the sources include when the backend rejects it", async () => {
+		const handler = new OpenAiCodexHandler({ apiModelId: "gpt-6.1-sol" })
+		const create = vi
+			.fn()
+			.mockRejectedValueOnce(new Error("sdk error"))
+			.mockResolvedValue({
+				async *[Symbol.asyncIterator]() {
+					yield completed
+				},
+			})
+		;(handler as any).client = { responses: { create } }
+		vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+			new Response(
+				JSON.stringify({ error: { message: "Invalid include: web_search_call.action.sources (web_search)" } }),
+				{ status: 400 },
+			),
+		)
+
+		await collect(handler)
+
+		const retried = create.mock.calls[1][0]
+		expect(retried.include ?? []).not.toContain("web_search_call.action.sources")
+		expect(retried.tools.map((tool: any) => tool.type)).toContain("web_search")
+	})
+
 	it("leaves hosted tools out when turned off in settings", async () => {
 		const handler = new OpenAiCodexHandler({
 			apiModelId: "gpt-6.1-sol",

@@ -51,13 +51,33 @@ export function buildHostedTools(options: HostedToolOptions): Record<string, unk
 	return tools
 }
 
+export const WEB_SEARCH_SOURCES_INCLUDE = "web_search_call.action.sources"
+
+/**
+ * `include` entries to request alongside the hosted tools. Search results only list the pages
+ * they used when "web_search_call.action.sources" is requested.
+ */
+export function hostedToolIncludes(tools: Record<string, unknown>[]): string[] {
+	const usesWebSearch = tools.some((tool) => tool.type === "web_search")
+	return usesWebSearch && !rejectedHostedTools.has("web_search.sources") ? [WEB_SEARCH_SOURCES_INCLUDE] : []
+}
+
 /**
  * Works out which hosted tool a 400 error is about, so the request can be retried without it.
- * The image tool's `model` field is dropped first (some accounts reject it) before the tool itself.
+ * The image tool's `model` field is dropped first (some accounts reject it) before the tool itself;
+ * the search sources `include` is dropped before web search itself.
  */
 export function hostedToolToDropForError(message: string, tools: Record<string, unknown>[]): string | undefined {
 	const text = message.toLowerCase()
 	const types = new Set(tools.map((tool) => String(tool.type)))
+
+	if (
+		types.has("web_search") &&
+		text.includes(WEB_SEARCH_SOURCES_INCLUDE) &&
+		!rejectedHostedTools.has("web_search.sources")
+	) {
+		return "web_search.sources"
+	}
 
 	if (types.has("image_generation") && text.includes("image_generation")) {
 		const image = tools.find((tool) => tool.type === "image_generation")
