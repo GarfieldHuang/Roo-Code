@@ -147,6 +147,7 @@
 		"noResults": "Tidak ada hasil yang ditemukan"
 	},
 	"addImages": "Tambahkan gambar ke pesan",
+	"addFiles": "Lampirkan file atau gambar",
 	"sendMessage": "Kirim pesan",
 	"pressToSend": "Tekan {{keyCombination}} untuk mengirim",
 	"stopTts": "Hentikan text-to-speech",

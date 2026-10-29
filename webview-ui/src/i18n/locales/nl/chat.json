@@ -117,6 +117,7 @@
 		"noResults": "Geen resultaten gevonden"
 	},
 	"addImages": "Afbeeldingen toevoegen aan bericht",
+	"addFiles": "Bestanden of afbeeldingen bijvoegen",
 	"sendMessage": "Bericht verzenden",
 	"pressToSend": "Druk op {{keyCombination}} om te verzenden",
 	"stopTts": "Stop tekst-naar-spraak",

@@ -82,6 +82,7 @@ export interface ExtensionMessage {
 		| "taskWithAggregatedCosts"
 		| "openAiCodexRateLimits"
 		| "openAiCodexModels"
+		| "attachmentsReady"
 		// Worktree response types
 		| "worktreeList"
 		| "worktreeResult"
@@ -128,6 +129,8 @@ export interface ExtensionMessage {
 	ollamaModels?: ModelRecord
 	lmStudioModels?: ModelRecord
 	openAiCodexModels?: ModelRecord
+	/** File mentions (e.g. `@/path`) to insert into the chat input (attachmentsReady) */
+	mentions?: string[]
 	vsCodeLmModels?: { vendor?: string; family?: string; version?: string; id?: string }[]
 	mcpServers?: McpServer[]
 	commits?: GitCommit[]
@@ -501,6 +504,8 @@ export interface WebviewMessage {
 		| "downloadErrorDiagnostics"
 		| "requestOpenAiCodexRateLimits"
 		| "requestOpenAiCodexModels"
+		| "selectAttachments"
+		| "saveAttachments"
 		| "refreshCustomTools"
 		| "requestModes"
 		| "switchMode"
@@ -549,6 +554,8 @@ export interface WebviewMessage {
 	promptMode?: string | "enhance"
 	customPrompt?: PromptComponent
 	dataUrls?: string[]
+	/** Files pasted or dropped into the chat input (saveAttachments) */
+	attachments?: { name: string; dataUrl?: string; tooLarge?: boolean }[]
 	/** Generic payload for webview messages that use `values` */
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	values?: Record<string, any>

@@ -758,6 +758,49 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 				messageTs: message.messageTs,
 			})
 			break
+		case "selectAttachments": {
+			try {
+				const { selectAttachments, toFileMention } = await import("../../integrations/misc/attachments")
+				const { images, paths } = await selectAttachments(message.bool !== false)
+				const cwd = getCurrentCwd()
+				await provider.postMessageToWebview({
+					type: "attachmentsReady",
+					requestId: message.requestId,
+					images,
+					mentions: paths.map((filePath) => toFileMention(filePath, cwd)),
+				})
+			} catch (error) {
+				const errorMessage = error instanceof Error ? error.message : String(error)
+				provider.log(`Error selecting attachments: ${errorMessage}`)
+				vscode.window.showErrorMessage(`Failed to attach files: ${errorMessage}`)
+			}
+			break
+		}
+		case "saveAttachments": {
+			try {
+				const { saveAttachments, toFileMention } = await import("../../integrations/misc/attachments")
+				const { paths, skipped } = await saveAttachments(
+					provider.contextProxy.globalStorageUri.fsPath,
+					message.attachments ?? [],
+				)
+				const cwd = getCurrentCwd()
+				await provider.postMessageToWebview({
+					type: "attachmentsReady",
+					requestId: message.requestId,
+					mentions: paths.map((filePath) => toFileMention(filePath, cwd)),
+				})
+				if (skipped.length > 0) {
+					vscode.window.showWarningMessage(
+						`Could not attach (too large or unreadable): ${skipped.join(", ")}`,
+					)
+				}
+			} catch (error) {
+				const errorMessage = error instanceof Error ? error.message : String(error)
+				provider.log(`Error saving attachments: ${errorMessage}`)
+				vscode.window.showErrorMessage(`Failed to attach files: ${errorMessage}`)
+			}
+			break
+		}
 		case "exportCurrentTask":
 			const currentTaskId = provider.getCurrentTask()?.taskId
 			if (currentTaskId) {

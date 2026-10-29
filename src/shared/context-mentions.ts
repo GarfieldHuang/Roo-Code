@@ -109,3 +109,8 @@ export function formatGitSuggestion(commit: {
 export function unescapeSpaces(path: string): string {
 	return path.replace(/\\ /g, " ")
 }
+
+// Helper function to escape spaces in paths so they stay inside one mention
+export function escapeSpaces(path: string): string {
+	return path.replace(/ /g, "\\ ")
+}

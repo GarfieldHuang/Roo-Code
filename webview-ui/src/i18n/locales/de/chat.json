@@ -109,6 +109,7 @@
 	"unlockApiConfigAcrossModes": "API-Konfiguration ist für alle Modi in diesem Arbeitsbereich gesperrt (klicke zum Entsperren)",
 	"enhancePrompt": "Prompt mit zusätzlichem Kontext verbessern",
 	"addImages": "Bilder zur Nachricht hinzufügen",
+	"addFiles": "Dateien oder Bilder anhängen",
 	"sendMessage": "Nachricht senden",
 	"pressToSend": "Drücke {{keyCombination}} zum Senden",
 	"stopTts": "Text-in-Sprache beenden",

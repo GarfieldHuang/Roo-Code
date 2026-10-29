@@ -109,6 +109,7 @@
 	"unlockApiConfigAcrossModes": "Konfiguracja API jest zablokowana dla wszystkich trybów w tym obszarze roboczym (kliknij, aby odblokować)",
 	"enhancePrompt": "Ulepsz podpowiedź dodatkowym kontekstem",
 	"addImages": "Dodaj obrazy do wiadomości",
+	"addFiles": "Załącz pliki lub obrazy",
 	"sendMessage": "Wyślij wiadomość",
 	"pressToSend": "Naciśnij {{keyCombination}}, aby wysłać",
 	"stopTts": "Zatrzymaj syntezę mowy",

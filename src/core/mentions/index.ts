@@ -9,7 +9,11 @@ import { mentionRegexGlobal, commandRegexGlobal, unescapeSpaces } from "../../sh
 import { getCommitInfo, getWorkingState } from "../../utils/git"
 
 import { openFile } from "../../integrations/misc/open-file"
-import { extractTextFromFileWithMetadata, type ExtractTextResult } from "../../integrations/misc/extract-text"
+import {
+	extractTextFromFileWithMetadata,
+	getSupportedBinaryFormats,
+	type ExtractTextResult,
+} from "../../integrations/misc/extract-text"
 import { diagnosticsToProblemsString } from "../../integrations/diagnostics"
 import { DEFAULT_LINE_LIMIT } from "../prompts/tools/native-tools/read_file"
 
@@ -279,7 +283,9 @@ async function getFileOrFolderContentWithMetadata(
 		if (stats.isFile()) {
 			// Avoid trying to include image binary content as text context.
 			// Image mentions are handled separately via image attachment flow.
-			const isBinary = await isBinaryFile(absPath).catch(() => false)
+			// Documents with a text extractor (PDF, DOCX, XLSX, ...) are still read below.
+			const hasTextExtractor = getSupportedBinaryFormats().includes(path.extname(absPath).toLowerCase())
+			const isBinary = !hasTextExtractor && (await isBinaryFile(absPath).catch(() => false))
 			if (isBinary) {
 				return {
 					type: "file",

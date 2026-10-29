@@ -1,7 +1,7 @@
 import React, { forwardRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useEvent } from "react-use"
 import DynamicTextArea from "react-textarea-autosize"
-import { VolumeX, Image, WandSparkles, SendHorizontal, X, ListEnd, Square } from "lucide-react"
+import { VolumeX, Paperclip, WandSparkles, SendHorizontal, X, ListEnd, Square } from "lucide-react"
 
 import type { ExtensionMessage } from "@roo-code/types"
 
@@ -33,6 +33,24 @@ import ContextMenu from "./ContextMenu"
 import { IndexingStatusBadge } from "./IndexingStatusBadge"
 import { usePromptHistory } from "./hooks/usePromptHistory"
 
+const ACCEPTED_IMAGE_SUBTYPES = ["png", "jpeg", "webp"]
+// Pasted/dropped files travel to the extension as data URLs; keep them to a sane size.
+const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024
+
+const readFileAsDataUrl = (file: File) =>
+	new Promise<string | null>((resolve) => {
+		const reader = new FileReader()
+		reader.onloadend = () => {
+			if (reader.error) {
+				console.error("Error reading file:", reader.error)
+				resolve(null)
+			} else {
+				resolve(typeof reader.result === "string" ? reader.result : null)
+			}
+		}
+		reader.readAsDataURL(file)
+	})
+
 interface ChatTextAreaProps {
 	inputValue: string
 	setInputValue: (value: string) => void
@@ -42,7 +60,8 @@ interface ChatTextAreaProps {
 	selectedImages: string[]
 	setSelectedImages: React.Dispatch<React.SetStateAction<string[]>>
 	onSend: () => void
-	onSelectImages: () => void
+	/** @deprecated The attach button now opens a file picker through the extension directly. */
+	onSelectImages?: () => void
 	shouldDisableImages: boolean
 	onHeightChange?: (height: number) => void
 	mode: Mode
@@ -67,7 +86,6 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 			selectedImages,
 			setSelectedImages,
 			onSend,
-			onSelectImages,
 			shouldDisableImages,
 			onHeightChange,
 			mode,
@@ -664,6 +682,69 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 			setIsFocused(false)
 		}, [isMouseDownOnMenu])
 
+		// Responses to attachment requests are matched by id, so only the input that asked
+		// (main chat box or a message being edited) inserts the result.
+		const attachmentRequestId = useMemo(() => `chat-attach-${Math.random().toString(36).slice(2)}`, [])
+
+		const insertFileMentions = useCallback(
+			(mentions: string[]) => {
+				if (mentions.length === 0) {
+					return
+				}
+
+				const before = inputValue.slice(0, cursorPosition)
+				const separator = before.length > 0 && !/\s$/.test(before) ? " " : ""
+				const insertion = separator + mentions.join(" ") + " "
+				setInputValue(before + insertion + inputValue.slice(cursorPosition))
+				const newCursorPosition = cursorPosition + insertion.length
+				setCursorPosition(newCursorPosition)
+				setIntendedCursorPosition(newCursorPosition)
+			},
+			[inputValue, cursorPosition, setInputValue],
+		)
+
+		/**
+		 * Adds pasted/dropped files to the message: supported images become image
+		 * attachments, any other file is stored by the extension and mentioned with `@`.
+		 */
+		const attachFiles = useCallback(
+			async (files: File[]) => {
+				const isImage = (file: File) => file.type.startsWith("image/")
+				const isAcceptedImage = (file: File) =>
+					isImage(file) && ACCEPTED_IMAGE_SUBTYPES.includes(file.type.split("/")[1])
+
+				// Images the current model cannot take are skipped, as before.
+				const imageFiles = shouldDisableImages ? [] : files.filter(isAcceptedImage)
+				const otherFiles = files.filter(
+					(file) => !isImage(file) || (!shouldDisableImages && !isAcceptedImage(file)),
+				)
+
+				if (imageFiles.length > 0) {
+					const dataUrls = (await Promise.all(imageFiles.map(readFileAsDataUrl))).filter(
+						(dataUrl): dataUrl is string => dataUrl !== null,
+					)
+
+					if (dataUrls.length > 0) {
+						setSelectedImages((prevImages) => [...prevImages, ...dataUrls].slice(0, MAX_IMAGES_PER_MESSAGE))
+					} else {
+						console.warn(t("chat:noValidImages"))
+					}
+				}
+
+				if (otherFiles.length > 0) {
+					const attachments = await Promise.all(
+						otherFiles.map(async (file) =>
+							file.size > MAX_ATTACHMENT_BYTES
+								? { name: file.name, tooLarge: true }
+								: { name: file.name, dataUrl: (await readFileAsDataUrl(file)) ?? undefined },
+						),
+					)
+					vscode.postMessage({ type: "saveAttachments", requestId: attachmentRequestId, attachments })
+				}
+			},
+			[shouldDisableImages, setSelectedImages, attachmentRequestId, t],
+		)
+
 		const handlePaste = useCallback(
 			async (e: React.ClipboardEvent) => {
 				const items = e.clipboardData.items
@@ -694,52 +775,23 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 					return
 				}
 
-				const acceptedTypes = ["png", "jpeg", "webp"]
+				// Files copied in the OS file manager arrive as clipboard files, just like screenshots.
+				const files = Array.from(e.clipboardData.files ?? [])
+				if (files.length === 0) {
+					files.push(
+						...Array.from(items)
+							.filter((item) => item.kind === "file")
+							.map((item) => item.getAsFile())
+							.filter((file): file is File => file !== null),
+					)
+				}
 
-				const imageItems = Array.from(items).filter((item) => {
-					const [type, subtype] = item.type.split("/")
-					return type === "image" && acceptedTypes.includes(subtype)
-				})
-
-				if (!shouldDisableImages && imageItems.length > 0) {
+				if (files.length > 0) {
 					e.preventDefault()
-
-					const imagePromises = imageItems.map((item) => {
-						return new Promise<string | null>((resolve) => {
-							const blob = item.getAsFile()
-
-							if (!blob) {
-								resolve(null)
-								return
-							}
-
-							const reader = new FileReader()
-
-							reader.onloadend = () => {
-								if (reader.error) {
-									console.error(t("chat:errorReadingFile"), reader.error)
-									resolve(null)
-								} else {
-									const result = reader.result
-									resolve(typeof result === "string" ? result : null)
-								}
-							}
-
-							reader.readAsDataURL(blob)
-						})
-					})
-
-					const imageDataArray = await Promise.all(imagePromises)
-					const dataUrls = imageDataArray.filter((dataUrl): dataUrl is string => dataUrl !== null)
-
-					if (dataUrls.length > 0) {
-						setSelectedImages((prevImages) => [...prevImages, ...dataUrls].slice(0, MAX_IMAGES_PER_MESSAGE))
-					} else {
-						console.warn(t("chat:noValidImages"))
-					}
+					await attachFiles(files)
 				}
 			},
-			[shouldDisableImages, setSelectedImages, cursorPosition, setInputValue, inputValue, t],
+			[cursorPosition, setInputValue, inputValue, attachFiles],
 		)
 
 		const handleMenuMouseDown = useCallback(() => {
@@ -855,60 +907,10 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 				const files = Array.from(e.dataTransfer.files)
 
 				if (files.length > 0) {
-					const acceptedTypes = ["png", "jpeg", "webp"]
-
-					const imageFiles = files.filter((file) => {
-						const [type, subtype] = file.type.split("/")
-						return type === "image" && acceptedTypes.includes(subtype)
-					})
-
-					if (!shouldDisableImages && imageFiles.length > 0) {
-						const imagePromises = imageFiles.map((file) => {
-							return new Promise<string | null>((resolve) => {
-								const reader = new FileReader()
-
-								reader.onloadend = () => {
-									if (reader.error) {
-										console.error(t("chat:errorReadingFile"), reader.error)
-										resolve(null)
-									} else {
-										const result = reader.result
-										resolve(typeof result === "string" ? result : null)
-									}
-								}
-
-								reader.readAsDataURL(file)
-							})
-						})
-
-						const imageDataArray = await Promise.all(imagePromises)
-						const dataUrls = imageDataArray.filter((dataUrl): dataUrl is string => dataUrl !== null)
-
-						if (dataUrls.length > 0) {
-							setSelectedImages((prevImages) =>
-								[...prevImages, ...dataUrls].slice(0, MAX_IMAGES_PER_MESSAGE),
-							)
-
-							if (typeof vscode !== "undefined") {
-								vscode.postMessage({ type: "draggedImages", dataUrls: dataUrls })
-							}
-						} else {
-							console.warn(t("chat:noValidImages"))
-						}
-					}
+					await attachFiles(files)
 				}
 			},
-			[
-				cursorPosition,
-				cwd,
-				inputValue,
-				setInputValue,
-				setCursorPosition,
-				setIntendedCursorPosition,
-				shouldDisableImages,
-				setSelectedImages,
-				t,
-			],
+			[cursorPosition, cwd, inputValue, setInputValue, setCursorPosition, setIntendedCursorPosition, attachFiles],
 		)
 
 		const [isTtsPlaying, setIsTtsPlaying] = useState(false)
@@ -920,6 +922,14 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 				setIsTtsPlaying(true)
 			} else if (message.type === "ttsStop") {
 				setIsTtsPlaying(false)
+			} else if (message.type === "attachmentsReady" && message.requestId === attachmentRequestId) {
+				if (message.images?.length) {
+					setSelectedImages((prevImages) =>
+						[...prevImages, ...message.images!].slice(0, MAX_IMAGES_PER_MESSAGE),
+					)
+				}
+				insertFileMentions(message.mentions ?? [])
+				textAreaRef.current?.focus()
 			}
 		})
 
@@ -1122,11 +1132,16 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 							/>
 
 							<div className="absolute bottom-2 right-1 z-30 flex flex-col items-center gap-0">
-								<StandardTooltip content={t("chat:addImages")}>
+								<StandardTooltip content={t("chat:addFiles")}>
 									<button
-										aria-label={t("chat:addImages")}
-										disabled={shouldDisableImages}
-										onClick={!shouldDisableImages ? onSelectImages : undefined}
+										aria-label={t("chat:addFiles")}
+										onClick={() =>
+											vscode.postMessage({
+												type: "selectAttachments",
+												requestId: attachmentRequestId,
+												bool: !shouldDisableImages,
+											})
+										}
 										className={cn(
 											"relative inline-flex items-center justify-center",
 											"bg-transparent border-none p-1.5",
@@ -1134,17 +1149,12 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 											"text-vscode-descriptionForeground hover:text-vscode-foreground",
 											"transition-all duration-1000",
 											"cursor-pointer",
-											!shouldDisableImages
-												? "opacity-50 hover:opacity-100 delay-750 pointer-events-auto"
-												: "opacity-0 pointer-events-none duration-200 delay-0",
-											!shouldDisableImages &&
-												"hover:bg-[rgba(255,255,255,0.03)] hover:border-[rgba(255,255,255,0.15)]",
+											"opacity-50 hover:opacity-100 delay-750 pointer-events-auto",
+											"hover:bg-[rgba(255,255,255,0.03)] hover:border-[rgba(255,255,255,0.15)]",
 											"focus:outline-none focus-visible:ring-1 focus-visible:ring-vscode-focusBorder",
-											!shouldDisableImages && "active:bg-[rgba(255,255,255,0.1)]",
-											shouldDisableImages &&
-												"opacity-40 cursor-not-allowed grayscale-[30%] hover:bg-transparent hover:border-[rgba(255,255,255,0.08)] active:bg-transparent",
+											"active:bg-[rgba(255,255,255,0.1)]",
 										)}>
-										<Image className="w-4 h-4" />
+										<Paperclip className="w-4 h-4" />
 									</button>
 								</StandardTooltip>
 								{isEditMode ? (

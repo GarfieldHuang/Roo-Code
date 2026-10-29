@@ -109,6 +109,7 @@
 	"unlockApiConfigAcrossModes": "La configuració de l'API està bloquejada a tots els modes en aquest espai de treball (fes clic per desbloquejar)",
 	"enhancePrompt": "Millora la sol·licitud amb context addicional",
 	"addImages": "Afegeix imatges al missatge",
+	"addFiles": "Adjunta fitxers o imatges",
 	"sendMessage": "Envia el missatge",
 	"pressToSend": "Prem {{keyCombination}} per enviar",
 	"stopTts": "Atura la síntesi de veu",
