@@ -44,11 +44,20 @@ function mockStream(handler: OpenAiCodexHandler, events: any[]) {
 	return create
 }
 
-async function collect(handler: OpenAiCodexHandler) {
+const attemptCompletionTool = {
+	type: "function" as const,
+	function: {
+		name: "attempt_completion",
+		description: "Finish the task",
+		parameters: { type: "object", properties: { result: { type: "string" } }, required: ["result"] },
+	},
+}
+
+async function collect(handler: OpenAiCodexHandler, tools: any[] = []) {
 	const chunks: any[] = []
 	for await (const chunk of handler.createMessage("system", [{ role: "user", content: "hi" } as any], {
 		taskId: "task-123",
-		tools: [],
+		tools,
 	})) {
 		chunks.push(chunk)
 	}
@@ -165,6 +174,53 @@ describe("OpenAI Codex hosted tools", () => {
 		expect(await fs.readFile(path.join(workspace.path, relative))).toEqual(png)
 		// The task turns this into an inline preview once the stream ends.
 		expect(chunks).toContainEqual({ type: "image", imagePath: path.join(workspace.path, relative) })
+	})
+
+	it("closes the turn with attempt_completion when a hosted tool ran but no Roo tool was called", async () => {
+		const handler = new OpenAiCodexHandler({ apiModelId: "gpt-6.1-sol" })
+		mockStream(handler, [
+			{
+				type: "response.output_item.done",
+				item: { type: "web_search_call", status: "completed", action: { type: "search", query: "q" } },
+			},
+			{ type: "response.output_text.delta", delta: "Index closed at 23,456." },
+			completed,
+		])
+
+		const chunks = await collect(handler, [attemptCompletionTool])
+
+		const last = chunks.filter((chunk) => chunk.type !== "usage").at(-1)
+		expect(last).toMatchObject({ type: "tool_call", name: "attempt_completion" })
+		expect(JSON.parse(last.arguments)).toEqual({ result: "Index closed at 23,456." })
+	})
+
+	it("does not add attempt_completion when the model already called a tool", async () => {
+		const handler = new OpenAiCodexHandler({ apiModelId: "gpt-6.1-sol" })
+		mockStream(handler, [
+			{
+				type: "response.output_item.done",
+				item: { type: "web_search_call", status: "completed", action: { type: "search", query: "q" } },
+			},
+			{
+				type: "response.output_item.added",
+				item: { type: "function_call", call_id: "call_1", name: "attempt_completion", arguments: "" },
+			},
+			{ type: "response.function_call_arguments.delta", delta: '{"result":"done"}' },
+			completed,
+		])
+
+		const chunks = await collect(handler, [attemptCompletionTool])
+
+		expect(chunks.filter((chunk) => chunk.type === "tool_call")).toEqual([])
+	})
+
+	it("does not add attempt_completion when no hosted tool ran", async () => {
+		const handler = new OpenAiCodexHandler({ apiModelId: "gpt-6.1-sol" })
+		mockStream(handler, [{ type: "response.output_text.delta", delta: "Just text." }, completed])
+
+		const chunks = await collect(handler, [attemptCompletionTool])
+
+		expect(chunks.filter((chunk) => chunk.type === "tool_call")).toEqual([])
 	})
 
 	it("tells the model to still call a tool after hosted tools", async () => {

@@ -88,6 +88,8 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 	private sawTextOutputInCurrentResponse = false
 	// Tracks whether text arrived through delta events so content_part events can be treated as fallback-only.
 	private sawTextDeltaInCurrentResponse = false
+	// Whether a hosted tool (web search / image generation) ran in this response.
+	private usedHostedToolInCurrentResponse = false
 	// Tracks tool call IDs emitted via streaming partial events to prevent done-event duplicates.
 	private streamedToolCallIds = new Set<string>()
 
@@ -182,6 +184,7 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 		this.sawTextOutputInCurrentResponse = false
 		this.sawTextDeltaInCurrentResponse = false
 		this.streamedToolCallIds.clear()
+		this.usedHostedToolInCurrentResponse = false
 
 		// Get access token from OAuth manager
 		let accessToken = await openAiCodexOAuthManager.getAccessToken()
@@ -209,7 +212,35 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 		let refreshedToken = false
 		for (let attempt = 0; attempt < 4; attempt++) {
 			try {
-				yield* this.executeRequest(requestBody, model, accessToken, metadata?.taskId)
+				let responseText = ""
+				let calledFunctionTool = false
+				const savedImages: string[] = []
+				for await (const chunk of this.executeRequest(requestBody, model, accessToken, metadata?.taskId)) {
+					if (chunk.type === "text") {
+						responseText += chunk.text
+					} else if (chunk.type === "image") {
+						savedImages.push(chunk.imagePath)
+					} else if (chunk.type === "tool_call" || chunk.type === "tool_call_partial") {
+						calledFunctionTool = true
+					}
+					yield chunk
+				}
+
+				// Models often stop right after a hosted tool without calling one of Roo's tools,
+				// which Roo treats as a mistake and retries (regenerating images). Close the turn
+				// with attempt_completion carrying what the model already said.
+				const offersCompletion = (metadata?.tools ?? []).some(
+					(tool) => tool.type === "function" && tool.function.name === "attempt_completion",
+				)
+				if (this.usedHostedToolInCurrentResponse && !calledFunctionTool && offersCompletion) {
+					const result = responseText.trim() || savedImages.map((imagePath) => `🖼️ ${imagePath}`).join("\n")
+					yield {
+						type: "tool_call",
+						id: `call_hosted_completion_${uuidv7()}`,
+						name: "attempt_completion",
+						arguments: JSON.stringify({ result }),
+					}
+				}
 				return
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error)
@@ -1083,6 +1114,7 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 					}
 				} else if (event.type === "response.output_item.done" && item.type === "web_search_call") {
 					// Hosted web search ran on the backend; show what it looked up.
+					this.usedHostedToolInCurrentResponse = true
 					const description = describeWebSearchCall(item)
 					if (description) {
 						yield { type: "reasoning", text: `\n${description}\n` }
@@ -1090,6 +1122,7 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 				} else if (event.type === "response.output_item.done" && item.type === "image_generation_call") {
 					// Hosted image generation returns the PNG as base64; save it into the workspace and
 					// mention the path in the reply so later turns (and the user) can find it.
+					this.usedHostedToolInCurrentResponse = true
 					if (typeof item.result === "string" && item.result.length > 0) {
 						try {
 							const workspacePath = getWorkspacePath()
