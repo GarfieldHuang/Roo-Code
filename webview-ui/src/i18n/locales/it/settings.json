@@ -310,6 +310,12 @@
 		"vercelAiGatewayApiKey": "Chiave API Vercel AI Gateway",
 		"getVercelAiGatewayApiKey": "Ottieni chiave API Vercel AI Gateway",
 		"apiKeyStorageNotice": "Le chiavi API sono memorizzate in modo sicuro nell'Archivio Segreto di VSCode",
+		"openAiCodex": {
+			"webSearch": "Ricerca web",
+			"webSearchDescription": "Consente al modello di cercare sul web e aprire pagine. Viene eseguita sui server di OpenAI tramite il tuo abbonamento ChatGPT.",
+			"imageGeneration": "Generazione di immagini",
+			"imageGenerationDescription": "Consente al modello di creare immagini (gpt-image-2). Le immagini vengono salvate in generated_images/ nell'area di lavoro."
+		},
 		"openAiCodexRateLimits": {
 			"title": "Usage Limits for Codex{{planLabel}}",
 			"loading": "Loading usage limits...",

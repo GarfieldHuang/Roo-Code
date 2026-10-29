@@ -310,6 +310,12 @@
 		"vercelAiGatewayApiKey": "Vercel AI Gateway API 密钥",
 		"getVercelAiGatewayApiKey": "获取 Vercel AI Gateway API 密钥",
 		"apiKeyStorageNotice": "API 密钥安全存储在 VSCode 的密钥存储中",
+		"openAiCodex": {
+			"webSearch": "网络搜索",
+			"webSearchDescription": "让模型搜索网络并打开网页。在 OpenAI 服务器上执行，使用您的 ChatGPT 订阅额度。",
+			"imageGeneration": "图片生成",
+			"imageGenerationDescription": "让模型生成图片（gpt-image-2），图片会保存到工作区的 generated_images/ 文件夹。"
+		},
 		"openAiCodexRateLimits": {
 			"title": "Usage Limits for Codex{{planLabel}}",
 			"loading": "Loading usage limits...",

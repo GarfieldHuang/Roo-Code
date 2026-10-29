@@ -310,6 +310,12 @@
 		"vercelAiGatewayApiKey": "Vercel AI Gateway API कुंजी",
 		"getVercelAiGatewayApiKey": "Vercel AI Gateway API कुंजी प्राप्त करें",
 		"apiKeyStorageNotice": "API कुंजियाँ VSCode के सुरक्षित स्टोरेज में सुरक्षित रूप से संग्रहीत हैं",
+		"openAiCodex": {
+			"webSearch": "वेब खोज",
+			"webSearchDescription": "मॉडल को वेब पर खोजने और पेज खोलने दें। यह आपकी ChatGPT सदस्यता से OpenAI के सर्वर पर चलता है।",
+			"imageGeneration": "छवि निर्माण",
+			"imageGenerationDescription": "मॉडल को छवियाँ बनाने दें (gpt-image-2)। छवियाँ वर्कस्पेस के generated_images/ में सहेजी जाती हैं।"
+		},
 		"openAiCodexRateLimits": {
 			"title": "Usage Limits for Codex{{planLabel}}",
 			"loading": "Loading usage limits...",

@@ -1,4 +1,5 @@
 import React, { useMemo } from "react"
+import { VSCodeCheckbox } from "@vscode/webview-ui-toolkit/react"
 
 import { type ModelInfo, type ProviderSettings, openAiCodexDefaultModelId, openAiCodexModels } from "@roo-code/types"
 
@@ -82,6 +83,30 @@ export const OpenAICodex: React.FC<OpenAICodexProps> = ({
 				simplifySettings={simplifySettings}
 				hidePricing
 			/>
+
+			{/* Hosted tools run on the Codex backend; enabled unless explicitly turned off */}
+			<div className="flex flex-col gap-3">
+				<div>
+					<VSCodeCheckbox
+						checked={apiConfiguration.openAiCodexWebSearch !== false}
+						onChange={(e: any) => setApiConfigurationField("openAiCodexWebSearch", e.target.checked)}>
+						<span className="font-medium">{t("settings:providers.openAiCodex.webSearch")}</span>
+					</VSCodeCheckbox>
+					<div className="text-sm text-vscode-descriptionForeground ml-6 mt-1">
+						{t("settings:providers.openAiCodex.webSearchDescription")}
+					</div>
+				</div>
+				<div>
+					<VSCodeCheckbox
+						checked={apiConfiguration.openAiCodexImageGeneration !== false}
+						onChange={(e: any) => setApiConfigurationField("openAiCodexImageGeneration", e.target.checked)}>
+						<span className="font-medium">{t("settings:providers.openAiCodex.imageGeneration")}</span>
+					</VSCodeCheckbox>
+					<div className="text-sm text-vscode-descriptionForeground ml-6 mt-1">
+						{t("settings:providers.openAiCodex.imageGenerationDescription")}
+					</div>
+				</div>
+			</div>
 		</div>
 	)
 }

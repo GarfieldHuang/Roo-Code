@@ -310,6 +310,12 @@
 		"vercelAiGatewayApiKey": "Vercel AI Gateway API-sleutel",
 		"getVercelAiGatewayApiKey": "Vercel AI Gateway API-sleutel ophalen",
 		"apiKeyStorageNotice": "API-sleutels worden veilig opgeslagen in de geheime opslag van VSCode",
+		"openAiCodex": {
+			"webSearch": "Zoeken op het web",
+			"webSearchDescription": "Laat het model op het web zoeken en pagina's openen. Draait op de servers van OpenAI via je ChatGPT-abonnement.",
+			"imageGeneration": "Afbeeldingen genereren",
+			"imageGenerationDescription": "Laat het model afbeeldingen maken (gpt-image-2). Afbeeldingen worden opgeslagen in generated_images/ in de werkruimte."
+		},
 		"openAiCodexRateLimits": {
 			"title": "Usage Limits for Codex{{planLabel}}",
 			"loading": "Loading usage limits...",

@@ -310,6 +310,12 @@
 		"vercelAiGatewayApiKey": "Vercel AI Gateway API Key",
 		"getVercelAiGatewayApiKey": "Dapatkan Vercel AI Gateway API Key",
 		"apiKeyStorageNotice": "API key disimpan dengan aman di Secret Storage VSCode",
+		"openAiCodex": {
+			"webSearch": "Pencarian web",
+			"webSearchDescription": "Izinkan model mencari di web dan membuka halaman. Berjalan di server OpenAI melalui langganan ChatGPT Anda.",
+			"imageGeneration": "Pembuatan gambar",
+			"imageGenerationDescription": "Izinkan model membuat gambar (gpt-image-2). Gambar disimpan di generated_images/ dalam workspace."
+		},
 		"openAiCodexRateLimits": {
 			"title": "Usage Limits for Codex{{planLabel}}",
 			"loading": "Loading usage limits...",

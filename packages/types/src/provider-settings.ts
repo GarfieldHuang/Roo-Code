@@ -285,7 +285,10 @@ const geminiCliSchema = apiModelIdProviderModelSchema.extend({
 })
 
 const openAiCodexSchema = apiModelIdProviderModelSchema.extend({
-	// No additional settings needed - uses OAuth authentication
+	// Authentication uses OAuth. Hosted (server-side) tools run on the Codex backend;
+	// both default to enabled when unset.
+	openAiCodexWebSearch: z.boolean().optional(),
+	openAiCodexImageGeneration: z.boolean().optional(),
 })
 
 const openAiNativeSchema = apiModelIdProviderModelSchema.extend({

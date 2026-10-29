@@ -320,6 +320,12 @@
 		"vercelAiGatewayApiKey": "Vercel AI Gateway API 金鑰",
 		"getVercelAiGatewayApiKey": "取得 Vercel AI Gateway API 金鑰",
 		"apiKeyStorageNotice": "API 金鑰會安全地儲存在 VS Code 的 Secret Storage 中",
+		"openAiCodex": {
+			"webSearch": "網路搜尋",
+			"webSearchDescription": "讓模型搜尋網路並開啟網頁。在 OpenAI 伺服器上執行，使用您的 ChatGPT 訂閱額度。",
+			"imageGeneration": "圖片生成",
+			"imageGenerationDescription": "讓模型產生圖片（gpt-image-2），圖片會存到工作區的 generated_images/ 資料夾。"
+		},
 		"openAiCodexRateLimits": {
 			"title": "Codex 用量限制{{planLabel}}",
 			"loading": "正在載入用量限制...",

@@ -310,6 +310,12 @@
 		"vercelAiGatewayApiKey": "Vercel AI Gateway API Anahtarı",
 		"getVercelAiGatewayApiKey": "Vercel AI Gateway API Anahtarı Al",
 		"apiKeyStorageNotice": "API anahtarları VSCode'un Gizli Depolamasında güvenli bir şekilde saklanır",
+		"openAiCodex": {
+			"webSearch": "Web araması",
+			"webSearchDescription": "Modelin web'de arama yapmasına ve sayfa açmasına izin verir. ChatGPT aboneliğinizle OpenAI sunucularında çalışır.",
+			"imageGeneration": "Görsel oluşturma",
+			"imageGenerationDescription": "Modelin görsel oluşturmasına izin verir (gpt-image-2). Görseller çalışma alanındaki generated_images/ klasörüne kaydedilir."
+		},
 		"openAiCodexRateLimits": {
 			"title": "Usage Limits for Codex{{planLabel}}",
 			"loading": "Loading usage limits...",

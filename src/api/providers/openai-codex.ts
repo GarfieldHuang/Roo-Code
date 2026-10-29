@@ -1,4 +1,5 @@
 import * as os from "os"
+import * as path from "path"
 import { v7 as uuidv7 } from "uuid"
 import { Anthropic } from "@anthropic-ai/sdk"
 import OpenAI from "openai"
@@ -23,6 +24,14 @@ import { isMcpTool } from "../../utils/mcp-name"
 import { sanitizeOpenAiCallId } from "../../utils/tool-id"
 import { openAiCodexOAuthManager } from "../../integrations/openai-codex/oauth"
 import { getCachedOpenAiCodexModels } from "../../integrations/openai-codex/models"
+import {
+	buildHostedTools,
+	describeWebSearchCall,
+	hostedToolToDropForError,
+	markHostedToolRejected,
+	saveGeneratedImage,
+} from "../../integrations/openai-codex/hosted-tools"
+import { getWorkspacePath } from "../../utils/path"
 import { t } from "../../i18n"
 
 export type OpenAiCodexModel = ReturnType<OpenAiCodexHandler["getModel"]>
@@ -181,10 +190,11 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 		// Build request body
 		// Per the implementation guide: Codex backend may reject some parameters
 		// Notably: max_output_tokens and prompt_cache_retention may be rejected
-		const requestBody = this.buildRequestBody(model, formattedInput, systemPrompt, reasoningEffort, metadata)
+		let requestBody = this.buildRequestBody(model, formattedInput, systemPrompt, reasoningEffort, metadata)
 
-		// Make the request with retry on auth failure
-		for (let attempt = 0; attempt < 2; attempt++) {
+		// Make the request with retry on auth failure, and without a hosted tool the backend rejects
+		let refreshedToken = false
+		for (let attempt = 0; attempt < 4; attempt++) {
 			try {
 				yield* this.executeRequest(requestBody, model, accessToken, metadata?.taskId)
 				return
@@ -192,7 +202,16 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 				const message = error instanceof Error ? error.message : String(error)
 				const isAuthFailure = /unauthorized|invalid token|not authenticated|authentication|401/i.test(message)
 
-				if (attempt === 0 && isAuthFailure) {
+				const rejectedTool = hostedToolToDropForError(message, requestBody.tools ?? [])
+				if (rejectedTool) {
+					console.warn(`[OpenAI Codex] Backend rejected hosted tool "${rejectedTool}", retrying without it`)
+					markHostedToolRejected(rejectedTool)
+					requestBody = this.buildRequestBody(model, formattedInput, systemPrompt, reasoningEffort, metadata)
+					continue
+				}
+
+				if (!refreshedToken && isAuthFailure) {
+					refreshedToken = true
 					// Force refresh the token for retry
 					const refreshed = await openAiCodexOAuthManager.forceRefreshAccessToken()
 					if (!refreshed) {
@@ -288,15 +307,20 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 			store?: boolean
 			instructions?: string
 			include?: string[]
-			tools?: Array<{
-				type: "function"
-				name: string
-				description?: string
-				parameters?: any
-				strict?: boolean
-			}>
+			tools?: Array<
+				| {
+						type: "function"
+						name: string
+						description?: string
+						parameters?: any
+						strict?: boolean
+				  }
+				// Hosted tools (web_search, image_generation) executed by the Codex backend
+				| Record<string, unknown>
+			>
 			tool_choice?: any
 			parallel_tool_calls?: boolean
+			prompt_cache_key?: string
 		}
 
 		// Per the implementation guide: Codex backend may reject max_output_tokens
@@ -317,22 +341,31 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 						},
 					}
 				: {}),
-			tools: (metadata?.tools ?? [])
-				.filter((tool) => tool.type === "function")
-				.map((tool) => {
-					const isMcp = isMcpTool(tool.function.name)
-					return {
-						type: "function",
-						name: tool.function.name,
-						description: tool.function.description,
-						parameters: isMcp
-							? ensureAdditionalPropertiesFalse(tool.function.parameters)
-							: ensureAllRequired(tool.function.parameters),
-						strict: !isMcp,
-					}
+			tools: [
+				...(metadata?.tools ?? [])
+					.filter((tool) => tool.type === "function")
+					.map((tool) => {
+						const isMcp = isMcpTool(tool.function.name)
+						return {
+							type: "function" as const,
+							name: tool.function.name,
+							description: tool.function.description,
+							parameters: isMcp
+								? ensureAdditionalPropertiesFalse(tool.function.parameters)
+								: ensureAllRequired(tool.function.parameters),
+							strict: !isMcp,
+						}
+					}),
+				...buildHostedTools({
+					webSearch: this.options.openAiCodexWebSearch !== false,
+					// The Codex CLI only offers image generation to models that accept image input.
+					imageGeneration: this.options.openAiCodexImageGeneration !== false && !!model.info.supportsImages,
 				}),
+			],
 			tool_choice: metadata?.tool_choice,
 			parallel_tool_calls: metadata?.parallelToolCalls ?? true,
+			// Same key for every request of a task so the backend can reuse the cached prompt prefix.
+			prompt_cache_key: metadata?.taskId || this.sessionId,
 		}
 
 		return body
@@ -1031,6 +1064,27 @@ export class OpenAiCodexHandler extends BaseProvider implements SingleCompletion
 							id: callId,
 							name,
 							arguments: args,
+						}
+					}
+				} else if (event.type === "response.output_item.done" && item.type === "web_search_call") {
+					// Hosted web search ran on the backend; show what it looked up.
+					const description = describeWebSearchCall(item)
+					if (description) {
+						yield { type: "reasoning", text: `\n${description}\n` }
+					}
+				} else if (event.type === "response.output_item.done" && item.type === "image_generation_call") {
+					// Hosted image generation returns the PNG as base64; save it into the workspace and
+					// mention the path in the reply so later turns (and the user) can find it.
+					if (typeof item.result === "string" && item.result.length > 0) {
+						try {
+							const workspacePath = getWorkspacePath()
+							const savedPath = await saveGeneratedImage(item.result, workspacePath)
+							const displayPath = workspacePath
+								? path.relative(workspacePath, savedPath).replace(/\\/g, "/")
+								: savedPath
+							yield { type: "text", text: `\n\n🖼️ ${displayPath}\n\n` }
+						} catch (error) {
+							console.error("[OpenAI Codex] Failed to save generated image:", error)
 						}
 					}
 				} else if (!this.sawTextOutputInCurrentResponse) {

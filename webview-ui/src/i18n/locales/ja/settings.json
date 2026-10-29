@@ -310,6 +310,12 @@
 		"vercelAiGatewayApiKey": "Vercel AI Gateway APIキー",
 		"getVercelAiGatewayApiKey": "Vercel AI Gateway APIキーを取得",
 		"apiKeyStorageNotice": "APIキーはVSCodeのシークレットストレージに安全に保存されます",
+		"openAiCodex": {
+			"webSearch": "ウェブ検索",
+			"webSearchDescription": "モデルがウェブを検索してページを開けるようにします。ChatGPT サブスクリプションで OpenAI のサーバー上で実行されます。",
+			"imageGeneration": "画像生成",
+			"imageGenerationDescription": "モデルが画像を生成できるようにします（gpt-image-2）。画像はワークスペースの generated_images/ に保存されます。"
+		},
 		"openAiCodexRateLimits": {
 			"title": "Usage Limits for Codex{{planLabel}}",
 			"loading": "Loading usage limits...",
