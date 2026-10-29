@@ -505,6 +505,7 @@ export interface WebviewMessage {
 		| "requestOpenAiCodexRateLimits"
 		| "requestOpenAiCodexModels"
 		| "selectAttachments"
+		| "retryApiRequestNow"
 		| "saveAttachments"
 		| "refreshCustomTools"
 		| "requestModes"

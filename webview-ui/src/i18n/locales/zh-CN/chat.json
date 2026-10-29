@@ -138,6 +138,7 @@
 	},
 	"troubleMessage": "Roo遇到问题...",
 	"apiRequest": {
+		"retryNow": "立即重试",
 		"title": "API请求",
 		"failed": "API请求失败",
 		"streaming": "API请求...",

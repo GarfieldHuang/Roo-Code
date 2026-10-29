@@ -138,6 +138,7 @@
 	},
 	"troubleMessage": "Roo को समस्या हो रही है...",
 	"apiRequest": {
+		"retryNow": "अभी पुनः प्रयास करें",
 		"title": "API अनुरोध",
 		"failed": "API अनुरोध विफल हुआ",
 		"streaming": "API अनुरोध...",

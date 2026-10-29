@@ -160,6 +160,7 @@
 	"forNextMode": "for next mode",
 	"forPreviousMode": "for previous mode",
 	"apiRequest": {
+		"retryNow": "Retry now",
 		"title": "API Request",
 		"failed": "API Request Failed",
 		"streaming": "API Request...",

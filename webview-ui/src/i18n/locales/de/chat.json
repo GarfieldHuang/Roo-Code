@@ -138,6 +138,7 @@
 	},
 	"troubleMessage": "Roo hat Probleme...",
 	"apiRequest": {
+		"retryNow": "Jetzt erneut versuchen",
 		"title": "API-Anfrage",
 		"failed": "API-Anfrage fehlgeschlagen",
 		"streaming": "API-Anfrage...",

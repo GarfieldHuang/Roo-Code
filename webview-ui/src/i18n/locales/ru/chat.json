@@ -133,6 +133,7 @@
 	"forNextMode": "для следующего режима",
 	"forPreviousMode": "для предыдущего режима",
 	"apiRequest": {
+		"retryNow": "Повторить сейчас",
 		"title": "API-запрос",
 		"failed": "API-запрос не выполнен",
 		"streaming": "API-запрос...",

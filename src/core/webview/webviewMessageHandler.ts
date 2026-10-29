@@ -758,6 +758,9 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 				messageTs: message.messageTs,
 			})
 			break
+		case "retryApiRequestNow":
+			provider.getCurrentTask()?.skipRetryCountdown()
+			break
 		case "selectAttachments": {
 			try {
 				const { selectAttachments, toFileMention } = await import("../../integrations/misc/attachments")

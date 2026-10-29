@@ -4289,6 +4289,13 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	}
 
 	// Shared exponential backoff for retries (first-chunk and mid-stream)
+	/** Set by the "Retry now" button to end the current retry countdown early. */
+	private retryCountdownSkipped = false
+
+	public skipRetryCountdown(): void {
+		this.retryCountdownSkipped = true
+	}
+
 	private async backoffAndAnnounce(retryAttempt: number, error: any): Promise<void> {
 		try {
 			const state = await this.providerRef.deref()?.getState()
@@ -4340,15 +4347,21 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			headerText = headerText ? `${headerText}\n` : ""
 
 			// Show countdown timer with exponential backoff
+			this.retryCountdownSkipped = false
 			for (let i = finalDelay; i > 0; i--) {
 				// Check abort flag during countdown to allow early exit
 				if (this.abort) {
 					throw new Error(`[Task#${this.taskId}] Aborted during retry countdown`)
 				}
+				// The user pressed "Retry now"
+				if (this.retryCountdownSkipped) {
+					break
+				}
 
 				await this.say("api_req_retry_delayed", `${headerText}<retry_timer>${i}</retry_timer>`, undefined, true)
 				await delay(1000)
 			}
+			this.retryCountdownSkipped = false
 
 			await this.say("api_req_retry_delayed", headerText, undefined, false)
 		} catch (err) {

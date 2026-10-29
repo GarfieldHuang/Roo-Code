@@ -138,6 +138,7 @@
 	},
 	"troubleMessage": "Roo에 문제가 발생했습니다...",
 	"apiRequest": {
+		"retryNow": "지금 다시 시도",
 		"title": "API 요청",
 		"failed": "API 요청 실패",
 		"streaming": "API 요청...",

@@ -160,6 +160,7 @@
 	"forNextMode": "用於下一個模式",
 	"forPreviousMode": "用於上一個模式",
 	"apiRequest": {
+		"retryNow": "立即重試",
 		"title": "API 請求",
 		"failed": "API 請求失敗",
 		"streaming": "正在處理 API 請求...",
